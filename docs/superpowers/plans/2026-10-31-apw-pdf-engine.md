@@ -377,7 +377,7 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `interface PlacedRun { font: LoadedFont; size; color; x: number; glyphs: { id; dx; dy; advance }[]; text: string; clusters: number[]; path: string; underline?: boolean | 'dotted' }` — plus `PlacedShape { kind:'line'|'rect' … }` for fill leaders and checkbox fallback
   - Glyph advances inside a run already include the distributed extra spacing
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `left/center/right`: `placeLine` x of the first glyph = x, `x + (w-natural)/2`, `x + w - natural`
   - `justify`: extra space goes only to space items; the last line is left-aligned
   - `thaiDistributed reaches right edge`: a non-last line of `'ด้วยสำนักงานมีความประสงค์ขอจัดซื้อวัสดุ'…` → last glyph's x + advance === x + width (±0.01); gaps between clusters grow by `extra × 1/W`, spaces by `extra × 4/W`, where W = Σ weights; marks inside a cluster keep their dx/dy relative to the base
@@ -387,10 +387,10 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `anchors`: a word with anchor `{name:'kho', index:6}` → `anchors.get('kho')` equals the x of the cluster containing char 6, after alignment; `edge:'end'` = the end of that cluster
   - `@anchor tab`: `resolveTabStops([{at:'@kho'}], …)` uses the anchor; missing → `ANCHOR_NOT_FOUND`
   - `fill toEnd`: dotted leader from the current x to `contentRight`, with text drawn on top left-aligned (or centered when `align:'center'`)
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement.** Distribution only applies to the segment after the last tab (spec §6.4). Cluster gaps = boundaries between grapheme clusters inside word items plus boundaries between adjacent items; underline is drawn as a line shape 1.2pt below the baseline, thickness 0.05em.
-- [ ] **Step 4: Run** → PASS
-- [ ] **Step 5: Commit** `feat(core): alignment, tab stops, anchors, Thai distributed spacing`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement.** Distribution only applies to the segment after the last tab (spec §6.4). Cluster gaps = boundaries between grapheme clusters inside word items plus boundaries between adjacent items; underline is drawn as a line shape 1.2pt below the baseline, thickness 0.05em.
+- [x] **Step 4: Run** → PASS
+- [x] **Step 5: Commit** `feat(core): alignment, tab stops, anchors, Thai distributed spacing`
 
 ### Task 10: Paragraph layout and LayoutTree types
 
