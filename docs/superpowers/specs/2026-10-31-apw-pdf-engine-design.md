@@ -85,7 +85,8 @@ pnpm workspace, TypeScript strict, build ด้วย tsup (ESM + CJS + d.ts), t
 | `@apw-pdf/templates` | JSON templates + builder functions + data schema ของแต่ละแบบ | core | browser + Node |
 | `@apw-pdf/node` | `createRenderer()`, โหลดฟอนต์/รูปจาก fs, CLI `apw-pdf` | core, pdf, fonts, templates | Node ≥ 18 |
 | `@apw-pdf/react` | `usePdf`, `<PdfPreview>`, `<PdfDownloadButton>`, Web Worker | core, pdf, pdfjs-dist | browser, React ≥ 18 |
-| `@apw-pdf/mcp` | MCP server (stdio) | node, @modelcontextprotocol/sdk, pdfjs-dist, @napi-rs/canvas | Node ≥ 18 |
+| `@apw-pdf/raster` | PDF หน้าเดียว → PNG (ใช้ใน MCP `render_page_png` และ visual regression) | pdfjs-dist, @napi-rs/canvas | Node ≥ 18 |
+| `@apw-pdf/mcp` | MCP server (stdio) | node, raster, @modelcontextprotocol/sdk | Node ≥ 18 |
 
 กฎของขอบเขตแพ็กเกจ: `core` และ `pdf` ห้าม import `fs`, `path`, DOM — I/O ทั้งหมดผ่าน interface (`FontProvider`, `ImageProvider`) ที่ `node` และ `react` เป็นผู้ implement
 
@@ -204,7 +205,8 @@ interface IfBlock { type: 'if'; test: string; then: Block[]; else?: Block[] }
 | `thaiDate:"monthYear"` | "ตุลาคม 2569" |
 | `upper`, `lower`, `default:"-"`, `prefix:"..."` | ทั่วไป |
 
-- `numerals: 'thai'` แปลงเลขอารบิกเป็นเลขไทยหลัง binding (ทั้งเอกสาร ยกเว้นที่ตั้ง `numerals: 'arabic'` ที่ run)
+- `numerals: 'thai'` แปลงเลขอารบิกเป็นเลขไทยหลัง binding (ทั้งเอกสาร ยกเว้นที่ตั้ง `numerals: 'arabic'` ที่ run) โดยข้าม token ที่เป็นอีเมล/URL (`x1@a.go.th`, `https://...`) เพื่อไม่ให้ที่อยู่ใช้งานไม่ได้
+- ค่าที่ bind แล้วเป็นข้อความตามตัวอักษรเสมอ — ไม่ถูก bind ซ้ำ (data ที่มี `{{...}}` ไม่ถูกตีความ)
 - `toThaiBahtText` ของเดิมมีบั๊ก "เอ็ด" ในหลักล้าน/หลักหน่วยหลังล้าน — เขียนใหม่พร้อม test table (0, 1, 11, 21, 101, 1,000,001, 21,000,000.25 ฯลฯ)
 
 ## 6. Layout Engine
@@ -244,7 +246,8 @@ interface IfBlock { type: 'if'; test: string; then: Block[]; else?: Block[] }
 - `SignatureBlock.minLinesBefore` (ค่าเริ่มต้น 3): ถ้าบล็อกลงนามต้องขึ้นหน้าใหม่ ให้ดึงบรรทัดเนื้อหาก่อนหน้าตามมาอย่างน้อย 3 บรรทัด
 - Table: แบ่งระหว่างแถว (`allowRowSplit` ค่าเริ่มต้น false), `repeatHeader` วาดหัวตารางซ้ำทุกหน้า
 - บล็อกที่แบ่งไม่ได้และสูงเกินพื้นที่หน้า → error `BLOCK_TOO_TALL` พร้อม path
-- เลขหน้าวาดหลัง pagination เสร็จ (รู้ pageCount) ในพื้นที่ขอบบน/ล่าง ไม่กินพื้นที่ flow
+- เลขหน้าทำงานแบบ header ของ Word: `offset` = ระยะจากขอบกระดาษถึงบรรทัดเลขหน้า (ค่าเริ่มต้น 1.25 ซม. = header distance ของ Word) และในหน้าที่มีเลขหน้า เนื้อหาเริ่มที่ `max(margin.top, offset + lineHeight(เลขหน้า))` — เหมือน Word ที่ header สูงเกินขอบจะดันเนื้อหาลง; ข้อความเลขหน้าเติมหลัง pagination เสร็จ (รู้ pageCount)
+- `ColumnsBlock` ใน v1 ไม่แบ่งข้ามหน้าเสมอ (`keepTogether` รับไว้เพื่อความเข้ากันได้ในอนาคต) — สูงเกินหน้า → `BLOCK_TOO_TALL`
 
 ### 6.7 LayoutTree (สัญญาระหว่าง layout กับ writer)
 
@@ -299,11 +302,13 @@ type LayoutItem =
 
 ### 10.1 core / pdf (ใช้ตรงได้ทั้ง browser และ Node)
 ```ts
+// @apw-pdf/core
 const engine = await createEngine({ fonts: FontProvider, images?: ImageProvider })
 const result = engine.validate(doc, data)                       // { ok, issues: Issue[] }
 const tree   = await engine.layout(doc, data)                   // LayoutTree
-const bytes  = await writePdf(tree, { fonts: engine.fonts, images, creationDate? })
-const bytes2 = await engine.renderPdf(doc, data)                // layout + writePdf
+// @apw-pdf/pdf (core ไม่ขึ้นกับ pdf จึงห่อ engine อีกชั้น)
+const pdf    = await createPdfEngine({ fonts, images?, subsetWasm })
+const { bytes, pageCount, warnings } = await pdf.renderPdf(doc, data, { creationDate? })
 ```
 
 ### 10.2 node
@@ -364,6 +369,8 @@ class ApwPdfError extends Error { code: ErrorCode; path?: string; details?: unkn
 | `ANCHOR_NOT_FOUND` | อ้าง `@name` ที่ยังไม่ถูกวาง |
 | `BLOCK_TOO_TALL` | บล็อกแบ่งไม่ได้แต่สูงเกินหน้า |
 | `SEGMENTER_UNAVAILABLE` | runtime ไม่มี `Intl.Segmenter` |
+| `INVALID_VALUE` | ค่าที่ filter รับไม่ได้ เช่น `thaiDate` กับวันที่ที่ parse ไม่ได้, `baht` กับค่าที่ไม่ใช่ตัวเลข |
+| `LIMIT_EXCEEDED` | เกินขีดจำกัดใน §13 |
 
 Warnings (ไม่หยุดเรนเดอร์): `MISSING_GLYPH` (ตัวอักษรไม่มีในฟอนต์ → จะเป็นกล่อง), `FORCED_BREAK`, `FONT_STYLE_FALLBACK`, `MISSING_VARIABLE` (non-strict) — ทุกตัวมี `path`
 
