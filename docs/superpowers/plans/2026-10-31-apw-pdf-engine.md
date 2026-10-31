@@ -316,7 +316,7 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `graphemeClusters(text: string): string[]` — uses `Intl.Segmenter` grapheme granularity
   - `assertSegmenter(): void` — throws `SEGMENTER_UNAVAILABLE`
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `join invariant`: for each fixture, `segmentWords(s).join('') === s`
   - `glues open punctuation forward`: `'ขอ (ด่วน) มาก'` → contains token `'(ด่วน)'`
   - `glues close punctuation and ฯ ๆ back`: `'กรุงเทพฯ เด็กๆ'` → contains `'กรุงเทพฯ'` and `'เด็กๆ'`
@@ -324,10 +324,10 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `NBSP keeps number+unit`: `'10\u00A0บาท'` is one token
   - `graphemeClusters('น้ำกุ้ง')` → `['น้ำ','กุ้','ง']`
   - `missing segmenter`: stub `Intl.Segmenter = undefined` → `SEGMENTER_UNAVAILABLE`
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement.** Dictionary merge: greedy longest match of dictionary entries over the raw string first, protecting their ranges, then segment the gaps. Punctuation sets per spec §6.3.
-- [ ] **Step 4: Run** → PASS
-- [ ] **Step 5: Commit** `feat(core): thai word segmentation with punctuation and dictionary rules`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement.** Dictionary merge: greedy longest match of dictionary entries over the raw string first, protecting their ranges, then segment the gaps. Punctuation sets per spec §6.3.
+- [x] **Step 4: Run** → PASS
+- [x] **Step 5: Commit** `feat(core): thai word segmentation with punctuation and dictionary rules`
 
 ### Task 8: Inline items and line breaking
 
