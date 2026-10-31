@@ -1,0 +1,47 @@
+{
+  "name": "@apw-pdf/react",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./worker": "./dist/worker.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts,.tsx"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "dependencies": {
+    "@apw-pdf/core": "workspace:*",
+    "@apw-pdf/fonts": "workspace:*",
+    "@apw-pdf/pdf": "workspace:*",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "devDependencies": {
+    "@apw-pdf/templates": "workspace:*",
+    "@testing-library/react": "^16.2.0",
+    "@types/node": "^22.13.10",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "harfbuzzjs": "1.6.4",
+    "jsdom": "^26.0.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}

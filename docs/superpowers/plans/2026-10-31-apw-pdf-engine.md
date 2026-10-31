@@ -714,7 +714,7 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `<PdfPreview doc data scale?={1} className? />` — renders each page to a `<canvas>` with pdfjs-dist; accessible label "หน้า n จาก N"
   - `<PdfDownloadButton doc data fileName children />` — disabled while rendering
 
-- [ ] **Step 1: Failing tests** (jsdom; mock `createRenderClient`)
+- [x] **Step 1: Failing tests** (jsdom; mock `createRenderClient`)
   - `debounces`: 3 data changes within 100 ms → 1 render call, after 300 ms
   - `stale responses ignored`: respond out of order → state reflects the last request
   - `revokes object URLs` on new result and on unmount (spy on `URL.revokeObjectURL`)
@@ -722,10 +722,10 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `download button` triggers an anchor click with `download="memo.pdf"`, and is disabled while `rendering`
   - `worker handler`: calling the exported `handleMessage(req)` with the memo example → `ok:true` and bytes starting with `%PDF` (runs in node with fs-backed fetch stubs)
   - `fetchFontProvider` requests `/fonts/THSarabunIT9-Bold.ttf` for bold
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement.** React is a peer dependency (≥18); pdfjs-dist is a dependency, lazy-imported in `PdfPreview`.
-- [ ] **Step 4: Run** `pnpm -F @apw-pdf/react exec vitest run --coverage` → PASS, lines ≥ 80%
-- [ ] **Step 5: Commit** `feat(react): usePdf hook, preview, download button, worker rendering`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement.** React is a peer dependency (≥18); pdfjs-dist is a dependency, lazy-imported in `PdfPreview`.
+- [x] **Step 4: Run** `pnpm -F @apw-pdf/react exec vitest run --coverage` → PASS, lines ≥ 80%
+- [x] **Step 5: Commit** `feat(react): usePdf hook, preview, download button, worker rendering`
 
 ## Phase F — MCP
 
