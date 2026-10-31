@@ -404,17 +404,17 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `interface ParagraphLayout { lines: LaidLine[]; spaceBefore: number; spaceAfter: number; keepWithNext: boolean; keepLinesTogether: boolean; widowControl: boolean; path: string }`
   - `layoutParagraph(p: ResolvedParagraph, ctx: { fonts; base: FontSpec; styles; dictionary; contentLeft: number; contentWidth: number; anchors: AnchorTable; path: string }): Promise<{ layout: ParagraphLayout; warnings: Warning[] }>`
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `indents`: `indentLeft:'1cm', firstLineIndent:'2.5cm'` → line 0 starts at contentLeft + 28.35 + 70.87; line 1 at contentLeft + 28.35
   - `hanging indent`: `firstLineIndent:'-1cm', indentLeft:'2cm'` → line 0 at +28.35, rest at +56.69
   - `line height uses tallest run`: a line mixing a 16pt and a 20pt bold run → height = singleLineHeight(20pt)
   - `exactly spacing`: `lineSpacing:{exactly:'35pt'}` → every line height 35
   - `empty paragraph height` (Review Focus 1): `text:''` → 1 line of height 18.08 (IT9 16pt); no NaN in any field
   - `style reference`: `style:'label'` merges `styles.label`, and block props override the style
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement**
-- [ ] **Step 4: Run** → PASS
-- [ ] **Step 5: Commit** `feat(core): paragraph layout with indents and line spacing`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement**
+- [x] **Step 4: Run** → PASS
+- [x] **Step 5: Commit** `feat(core): paragraph layout with indents and line spacing`
 
 ### Task 11: Block flow and pagination
 
