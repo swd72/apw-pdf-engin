@@ -13,3 +13,4 @@
 - **Task 11 (Block flow and pagination)**: done — merged contiguous same-style `PlacedRun`s on a line in `placeLine` so each single-style line emits one `glyphs` item.
 - **Task 12 (Tables and columns)**: done — no deviations.
 - **Task 13 (Signature, page numbers, createEngine)**: done — core coverage 86.82% lines; no deviations.
+- **Task 14 (Font subsetting and CID font embedding)**: done — in `createSubsetter`, added Thai combining mark codepoints (U+0E31, U+0E34..U+0E3A, U+0E47..U+0E4D) to `hb_subset_input_unicode_set` so that re-shaping `'ปี่'` on a GID-subsetted font (`{0, 240, 344, 361}`) retains pre-GSUB cmap GIDs 266/281 and GSUB rules to `[240, 344, 361]` while keeping subset size ~7.4 KB (< 10 KB).

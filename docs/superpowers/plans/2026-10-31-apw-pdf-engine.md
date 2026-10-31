@@ -513,12 +513,12 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `buildToUnicodeCMap(map: Map<number, string>): string` — a `bfchar` entry per glyph, in chunks of ≤ 100
   - `embedCidFont(doc: PDFDocument, font: LoadedFont, usage: Map<number, string /*unicode*/>, subset: Subsetter): PDFRef` — a Type0 dict with `/Encoding /Identity-H`, a descendant CIDFontType2 with `/CIDToGIDMap /Identity`, `/W` from shaped advances in font units ×1000/upem, a FontDescriptor (flags 32, ascent/descent from the metrics, bbox from `head`) with `/FontFile2` = flate stream of the subset, and `/ToUnicode`
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `subset keeps gids`: subset THSarabunIT9 with glyphs {0, 240, 344, 361} → output < 10 KB; parse it with harfbuzzjs; shaping 'ปี่' on the subset yields the same glyph ids [240, 344, 361]
   - `ToUnicode`: `buildToUnicodeCMap(new Map([[240,'ป'],[344,'ี'],[361,'่']]))` contains `<00F0> <0E1B>`, `begincmap`, `endcmap`
   - `embed`: embedding into a new pdf-lib doc, then `doc.save()` and reloading with pdf-lib, gives a font dict with `/Subtype /Type0` and a `/FontFile2` stream
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement the subsetter** by instantiating the standalone wasm (it has no imports). Export calls:
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement the subsetter** by instantiating the standalone wasm (it has no imports). Export calls:
 
 ```ts
 // copy bytes in: p = malloc(n); new Uint8Array(memory.buffer).set(bytes, p)   — re-read memory.buffer after every malloc (it may grow)
@@ -531,8 +531,8 @@ it('unknown family → FONT_NOT_FOUND', …)
 ```
 
   `cidfont.ts` builds the dicts with `doc.context.obj({...})`, `doc.context.flateStream(bytes)`, and `doc.context.register(...)`.
-- [ ] **Step 4: Run** → PASS
-- [ ] **Step 5: Commit** `feat(pdf): retain-gid font subsetting and CID font embedding`
+- [x] **Step 4: Run** → PASS
+- [x] **Step 5: Commit** `feat(pdf): retain-gid font subsetting and CID font embedding`
 
 ### Task 15: `writePdf` and `createPdfEngine`
 
