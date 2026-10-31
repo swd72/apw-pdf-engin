@@ -14,3 +14,4 @@
 - **Task 12 (Tables and columns)**: done — no deviations.
 - **Task 13 (Signature, page numbers, createEngine)**: done — core coverage 86.82% lines; no deviations.
 - **Task 14 (Font subsetting and CID font embedding)**: done — in `createSubsetter`, added Thai combining mark codepoints (U+0E31, U+0E34..U+0E3A, U+0E47..U+0E4D) to `hb_subset_input_unicode_set` so that re-shaping `'ปี่'` on a GID-subsetted font (`{0, 240, 344, 361}`) retains pre-GSUB cmap GIDs 266/281 and GSUB rules to `[240, 344, 361]` while keeping subset size ~7.4 KB (< 10 KB).
+- **Task 15 (`writePdf` and `createPdfEngine`)**: done — `@apw-pdf/pdf` coverage 89.43% lines; collapsed HarfBuzz's decomposed unshifted sara am (`uni0E4D` + `uni0E32`) into the font's precomposed `uni0E33` glyph in `writePdf` so `/ToUnicode` round-trips U+0E33 (`'ำ'`) without colliding with U+0E32 (`'า'`).

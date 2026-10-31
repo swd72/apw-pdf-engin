@@ -38,7 +38,10 @@ export async function createSubsetter(
     wasm instanceof Uint8Array
       ? new Uint8Array(wasm.buffer, wasm.byteOffset, wasm.byteLength)
       : new Uint8Array(wasm)
-  const { instance } = await WebAssembly.instantiate(bytes, {})
+  const res = (await WebAssembly.instantiate(bytes, {})) as
+    | WebAssembly.WebAssemblyInstantiatedSource
+    | WebAssembly.Instance
+  const instance = 'instance' in res ? res.instance : res
   const ex = instance.exports as unknown as HbSubsetExports
 
   return (fontBytes: Uint8Array, glyphIds: Iterable<number>): Uint8Array => {

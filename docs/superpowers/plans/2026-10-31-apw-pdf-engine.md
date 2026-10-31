@@ -545,7 +545,7 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `interface PdfEngine extends Engine { renderPdf(doc: unknown, data: unknown, opts?: { strict?: boolean; creationDate?: Date }): Promise<{ bytes: Uint8Array; pageCount: number; warnings: Warning[] }> }`
   - `createPdfEngine(opts: { fonts: FontProvider; images?: ImageProvider; subsetWasm: Uint8Array | ArrayBuffer | (() => Promise<Uint8Array | ArrayBuffer>) }): Promise<PdfEngine>`
 
-- [ ] **Step 1: Failing tests** (pdfjs-dist as a devDependency, for reading back)
+- [x] **Step 1: Failing tests** (pdfjs-dist as a devDependency, for reading back)
   - `text round-trip`: render a doc with paragraph 'ด้วยสำนักงานขอจัดซื้อวัสดุ จำนวน ๑๐ รายการ' → pdfjs `getTextContent` joined without spaces equals the source without spaces
   - `positions`: the first glyph-run transform from pdfjs has x ≈ 85.04 and y ≈ 841.89 − baseline (±0.05)
   - `page size`: A4 mediabox `[0 0 595.2756 841.8898]`
@@ -554,16 +554,16 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `deterministic`: two renders with `creationDate: new Date(0)` → identical bytes
   - `metadata`: Producer 'apw-pdf', Title from `meta.title`
   - `missing glyph` (Review Focus 4): text 'ก✅' → bytes produced, `warnings` contains `{code:'MISSING_GLYPH', path:'blocks[0]'}`
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement.**
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement.**
   - Per page, emit the operators `BT /F{id} size Tf … ET`.
   - Each glyph is positioned absolutely with `Tm` per run, and a `TJ` array uses kerning numbers `-(advance_actual − advance_font) × 1000 / size` to apply distributed spacing.
   - Glyphs with non-zero dx/dy are emitted with their own `Td`.
   - Colors use `rg` (hex → 0–1).
   - Underline, lines, and rects are drawn as path ops; dashed lines use `d`.
   - Pass `useObjectStreams: false` to `save`; set dates and `/ID` deterministically from `creationDate`.
-- [ ] **Step 4: Run** `pnpm -F @apw-pdf/pdf exec vitest run --coverage` → PASS, lines ≥ 80%
-- [ ] **Step 5: Commit** `feat(pdf): pdf writer with shaped glyph runs and deterministic output`
+- [x] **Step 4: Run** `pnpm -F @apw-pdf/pdf exec vitest run --coverage` → PASS, lines ≥ 80%
+- [x] **Step 5: Commit** `feat(pdf): pdf writer with shaped glyph runs and deterministic output`
 
 ## Phase C — Templates
 
