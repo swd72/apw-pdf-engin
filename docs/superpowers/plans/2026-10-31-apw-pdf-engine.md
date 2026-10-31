@@ -456,7 +456,7 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `layoutColumns(c: ResolvedColumns, ctx, x, width, path): Promise<Fragment>` — never splittable in v1
   - `resolveColumnWidths(specs: (Length|`${number}%`|'*')[], total: number): number[]` — fixed first, then %, then `*` share the remainder equally
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `column widths`: `['2cm','50%','*']` over 453.54 → `[56.69, 226.77, 170.08]`
   - `borders and padding`: each cell draws 4 border lines of `border.width` (default 0.5pt); text starts at cell x + padding (default 3pt left/right, 1pt top)
   - `row height = max cell`; `vAlign:'middle'` centers
@@ -465,10 +465,10 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `row taller than page` with `allowRowSplit:false` → `BLOCK_TOO_TALL` with path `blocks[i].rows[j]`
   - `long URL in narrow cell` (Review Focus 3): 2cm column → all glyph x + advance ≤ cell right − padding, plus a `FORCED_BREAK` warning whose path contains `.rows[0][0]`
   - `columns side by side`: two 50% columns with a 6pt gap; the right column's first glyph x = contentLeft + (453.54 − 6)/2 + 6; height = max of the column heights
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement**
-- [ ] **Step 4: Run** → PASS
-- [ ] **Step 5: Commit** `feat(core): tables with header repeat and side-by-side columns`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement**
+- [x] **Step 4: Run** → PASS
+- [x] **Step 5: Commit** `feat(core): tables with header repeat and side-by-side columns`
 
 ### Task 13: Signature, page numbers, `createEngine`
 
