@@ -99,8 +99,8 @@ examples/express-server  examples/vite-react
   - `PAGE_SIZES: Record<'A4'|'A5'|'Letter'|'Legal', { width: number; height: number }>`
   - `pageBox(page: DocumentDef['page']): { width: number; height: number; margin: { top: number; bottom: number; left: number; right: number }; contentWidth: number; contentLeft: number; contentRight: number }`
 
-- [ ] **Step 1: Scaffold root.** pnpm workspace `packages/*` and `examples/*`; root scripts `build` (`pnpm -r build`), `test` (`pnpm -r test`), `lint`; ESLint `no-restricted-imports` for `fs`, `path`, `url`, `node:*` scoped to `packages/{core,pdf}/src/**`.
-- [ ] **Step 2: Write failing tests**
+- [x] **Step 1: Scaffold root.** pnpm workspace `packages/*` and `examples/*`; root scripts `build` (`pnpm -r build`), `test` (`pnpm -r test`), `lint`; ESLint `no-restricted-imports` for `fs`, `path`, `url`, `node:*` scoped to `packages/{core,pdf}/src/**`.
+- [x] **Step 2: Write failing tests**
 
 ```ts
 // units.test.ts
@@ -127,10 +127,10 @@ it('swaps for landscape', () => {
 // purity.test.ts — read every file under packages/{core,pdf}/src, fail if it matches /from ['"](node:|fs|path|url)['"]|\bwindow\.|\bdocument\./
 ```
 
-- [ ] **Step 3: Run** `pnpm -F @apw-pdf/core exec vitest run` → FAIL (modules missing)
-- [ ] **Step 4: Implement** `errors.ts` and `units.ts`. Negative lengths are allowed only where the schema allows them (firstLineIndent), so `toPt` takes `{ allowNegative?: boolean }`.
-- [ ] **Step 5: Run** → PASS
-- [ ] **Step 6: Commit** `chore: scaffold monorepo with core errors and units`
+- [x] **Step 3: Run** `pnpm -F @apw-pdf/core exec vitest run` → FAIL (modules missing)
+- [x] **Step 4: Implement** `errors.ts` and `units.ts`. Negative lengths are allowed only where the schema allows them (firstLineIndent), so `toPt` takes `{ allowNegative?: boolean }`.
+- [x] **Step 5: Run** → PASS
+- [x] **Step 6: Commit** `chore: scaffold monorepo with core errors and units`
 
 ### Task 2: Document schema
 

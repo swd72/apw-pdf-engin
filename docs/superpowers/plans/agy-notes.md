@@ -1,0 +1,3 @@
+# AGY Implementation Notes
+
+- **Task 1 (Workspace scaffold, errors, units)**: done — no deviations; added `allowBuilds: { esbuild: true }` to `pnpm-workspace.yaml` for pnpm 12 build approval.
