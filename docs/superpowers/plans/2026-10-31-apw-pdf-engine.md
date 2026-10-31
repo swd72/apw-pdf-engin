@@ -143,16 +143,16 @@ it('swaps for landscape', () => {
   - `parseDocument(input: unknown): DocumentDef` — throws `SCHEMA_INVALID` with `path` like `blocks[3].runs[0].size` and `details` = zod issues
   - `interface TemplateDef { name: string; description: string; document: DocumentDef; dataSchema: object; example: unknown }`
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `parses minimal doc`: `{version:1,page:{size:'A4',margin:{top:'1.5cm',bottom:'2cm',left:'3cm',right:'2cm'}},font:{family:'THSarabunIT9',size:'16pt'},blocks:[{type:'paragraph',text:'ก'}]}` → ok
   - `reports path`: `blocks:[{type:'paragraph',runs:[{text:'x',size:'big'}]}]` → error `code==='SCHEMA_INVALID'` and `path==='blocks[0].runs[0].size'`
   - `rejects unknown block type` with path `blocks[0].type`
   - `accepts every block type from spec §5.3`: one fixture per type, parsed without error
   - `accepts tab at anchor ref`: `tabs:[{at:'@kho'}]` ok; `tabs:[{at:'kho'}]` rejected
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement** with recursive `z.lazy` for blocks (`each`, `if`, `columns`, cell `blocks`). Length validator = string regex `^-?\d+(\.\d+)?(pt|mm|cm|in)$` or number. Convert zod issue paths to `a[0].b` form.
-- [ ] **Step 4: Run** → PASS
-- [ ] **Step 5: Commit** `feat(core): document schema with path-aware validation`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement** with recursive `z.lazy` for blocks (`each`, `if`, `columns`, cell `blocks`). Length validator = string regex `^-?\d+(\.\d+)?(pt|mm|cm|in)$` or number. Convert zod issue paths to `a[0].b` form.
+- [x] **Step 4: Run** → PASS
+- [x] **Step 5: Commit** `feat(core): document schema with path-aware validation`
 
 ### Task 3: Thai utilities
 
