@@ -684,15 +684,15 @@ it('unknown family → FONT_NOT_FOUND', …)
 - Produces: `rasterizePage(pdf: Uint8Array, pageNumber: number, opts?: { dpi?: number /* default 150, max 200 */ }): Promise<Uint8Array /* PNG */>` — uses the pdfjs-dist legacy build plus `@napi-rs/canvas`; `pageNumber` out of range → `RangeError`
 - Golden workflow: when `UPDATE_GOLDEN=1`, the test writes the goldens; otherwise it compares with pixelmatch (threshold 0.1) and fails if more than 0.1% of pixels differ
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - an A4 page at 150 dpi → PNG of 1240×1754 px
   - dpi 300 → clamped to 200
   - page 0 → RangeError
   - a visual test for each template example, page 1
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement**, then generate the goldens with `UPDATE_GOLDEN=1 pnpm -F @apw-pdf/templates exec vitest run visual`. **Open each golden PNG and check it by eye** against spec §3 (garuda placement, title, leaders, signature). Report any visual issue before committing the goldens.
-- [ ] **Step 4: Run** (without `UPDATE_GOLDEN`) → PASS
-- [ ] **Step 5: Commit** `test: rasterizer and visual regression goldens for templates`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement**, then generate the goldens with `UPDATE_GOLDEN=1 pnpm -F @apw-pdf/templates exec vitest run visual`. **Open each golden PNG and check it by eye** against spec §3 (garuda placement, title, leaders, signature). Report any visual issue before committing the goldens.
+- [x] **Step 4: Run** (without `UPDATE_GOLDEN`) → PASS
+- [x] **Step 5: Commit** `test: rasterizer and visual regression goldens for templates`
 
 ## Phase E — React
 

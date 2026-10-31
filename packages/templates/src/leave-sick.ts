@@ -149,8 +149,8 @@ const leaveSickDocument: DocumentDef = {
     {
       type: 'paragraph',
       tabs: [
-        { at: '6.5cm', align: 'left' },
-        { at: '12.5cm', align: 'left' },
+        { at: '6cm', align: 'left' },
+        { at: '11.5cm', align: 'left' },
       ],
       runs: [
         { text: 'ตั้งแต่วันที่  ' },
@@ -160,7 +160,7 @@ const leaveSickDocument: DocumentDef = {
         { fill: '{{toDate | thaiDate:"long"}}', width: 'toTab', leader: 'dots' },
         { tab: true },
         { text: '  มีกำหนด  ' },
-        { fill: '{{days}}', width: '1.2cm', leader: 'dots', align: 'center' },
+        { fill: '{{days}}', width: '1cm', leader: 'dots', align: 'center' },
         { text: '  วัน' },
       ],
     },
@@ -168,7 +168,7 @@ const leaveSickDocument: DocumentDef = {
       type: 'paragraph',
       tabs: [
         { at: '7cm', align: 'left' },
-        { at: '12.5cm', align: 'left' },
+        { at: '11.8cm', align: 'left' },
       ],
       runs: [
         { text: 'ข้าพเจ้าได้ลาครั้งสุดท้ายตั้งแต่วันที่  ' },

@@ -28,8 +28,10 @@
   "devDependencies": {
     "@apw-pdf/fonts": "workspace:*",
     "@apw-pdf/pdf": "workspace:*",
+    "@apw-pdf/raster": "workspace:*",
     "@types/node": "^22.13.10",
     "harfbuzzjs": "1.6.4",
+    "pixelmatch": "^6.0.0",
     "pngjs": "^7.0.0",
     "tsup": "^8.4.0",
     "typescript": "^5.8.2",

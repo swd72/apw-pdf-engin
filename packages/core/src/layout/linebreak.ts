@@ -45,7 +45,7 @@ function createSubWord(
 export function breakLines(
   items: InlineItem[],
   widthFor: (lineIndex: number) => number,
-  measureTabs: (items: InlineItem[]) => number,
+  measureTabs: (items: InlineItem[], lineIndex?: number) => number,
 ): { lines: BrokenLine[]; warnings: Warning[] } {
   const warnings: Warning[] = []
 
@@ -124,7 +124,7 @@ export function breakLines(
     afterAutoWrap = false
     const avail = widthFor(lineIndex)
     const candidate = [...current, item]
-    const w = measureTabs(candidate)
+    const w = measureTabs(candidate, lineIndex)
 
     if (w <= avail + 1e-6) {
       current.push(item)
@@ -139,7 +139,7 @@ export function breakLines(
     }
 
     const freshAvail = widthFor(lineIndex)
-    if (item.kind === 'word' && measureTabs([item]) > freshAvail + 1e-6) {
+    if (item.kind === 'word' && measureTabs([item], lineIndex) > freshAvail + 1e-6) {
       forceBreakWord(item)
     } else {
       current.push(item)

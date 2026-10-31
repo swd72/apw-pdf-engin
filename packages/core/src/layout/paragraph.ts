@@ -110,7 +110,11 @@ export async function layoutParagraph(
   const { lines: brokenLines, warnings: breakWarnings } = breakLines(
     items,
     widthFor,
-    (lineItems: InlineItem[]) => naturalWidth(lineItems, baseTabCtx),
+    (lineItems: InlineItem[], lineIndex = 0) =>
+      naturalWidth(lineItems, {
+        ...baseTabCtx,
+        lineStartX: lineIndex === 0 ? indentLeftX + firstLineIndent : indentLeftX,
+      }),
   )
   warnings.push(...breakWarnings)
 

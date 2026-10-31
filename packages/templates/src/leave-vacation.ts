@@ -126,21 +126,21 @@ const leaveVacationDocument: DocumentDef = {
         { text: 'มีวันลาพักผ่อนสะสม  ' },
         {
           fill: '{{accumulatedDays}}',
-          width: '1.2cm',
+          width: '0.9cm',
           leader: 'dots',
           align: 'center',
         },
         { text: '  วันทำการ มีสิทธิลาพักผ่อนประจำปีนี้อีก  ' },
         {
           fill: '{{currentYearDays}}',
-          width: '1.2cm',
+          width: '0.9cm',
           leader: 'dots',
           align: 'center',
         },
         { text: '  วันทำการ รวมเป็น  ' },
         {
           fill: '{{totalDays}}',
-          width: '1.2cm',
+          width: '0.9cm',
           leader: 'dots',
           align: 'center',
         },
@@ -150,8 +150,8 @@ const leaveVacationDocument: DocumentDef = {
     {
       type: 'paragraph',
       tabs: [
-        { at: '7.5cm', align: 'left' },
-        { at: '12.5cm', align: 'left' },
+        { at: '7cm', align: 'left' },
+        { at: '11.8cm', align: 'left' },
       ],
       runs: [
         { text: 'ขอลาพักผ่อนตั้งแต่วันที่  ' },
@@ -161,7 +161,7 @@ const leaveVacationDocument: DocumentDef = {
         { fill: '{{toDate | thaiDate:"long"}}', width: 'toTab', leader: 'dots' },
         { tab: true },
         { text: '  มีกำหนด  ' },
-        { fill: '{{days}}', width: '1.2cm', leader: 'dots', align: 'center' },
+        { fill: '{{days}}', width: '1cm', leader: 'dots', align: 'center' },
         { text: '  วัน' },
       ],
     },
