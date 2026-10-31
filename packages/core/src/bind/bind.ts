@@ -180,12 +180,13 @@ export function bindDocument(
     scope: Record<string, unknown>,
     path: string,
   ): ResolvedCell {
-    const out: ResolvedCell = { ...cell }
-    if (cell.text !== undefined) {
-      out.text = bindStr(cell.text, scope, `${path}.text`)
+    const { blocks, text, ...rest } = cell
+    const out: ResolvedCell = { ...rest }
+    if (text !== undefined) {
+      out.text = bindStr(text, scope, `${path}.text`)
     }
-    if (cell.blocks !== undefined) {
-      out.blocks = bindBlocks(cell.blocks, scope, `${path}.blocks`)
+    if (blocks !== undefined) {
+      out.blocks = bindBlocks(blocks, scope, `${path}.blocks`)
     }
     return out
   }
@@ -259,12 +260,13 @@ export function bindDocument(
           break
         }
         case 'paragraph': {
-          const rp: ResolvedParagraph = { ...b }
-          if (b.text !== undefined) {
-            rp.text = bindStr(b.text, scope, `${path}.text`)
+          const { runs, text, ...rest } = b
+          const rp: ResolvedParagraph = { ...rest }
+          if (text !== undefined) {
+            rp.text = bindStr(text, scope, `${path}.text`)
           }
-          if (b.runs !== undefined) {
-            rp.runs = b.runs.map((r, rIdx) => bindInline(r, scope, `${path}.runs[${rIdx}]`))
+          if (runs !== undefined) {
+            rp.runs = runs.map((r, rIdx) => bindInline(r, scope, `${path}.runs[${rIdx}]`))
           }
           out.push(rp)
           break

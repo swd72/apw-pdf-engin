@@ -242,18 +242,18 @@ it('thai dates', () => {
     - `interface ImageProvider { load(src: string): Promise<Uint8Array> }`
   - test helper: `testFontProvider(): FontProvider` (reads `packages/fonts/files`)
 
-- [ ] **Step 1: Copy fonts** from `C:\Users\apiwat\Videos\font` and rename to ASCII `<Family>-<Regular|Bold|Italic|BoldItalic>.ttf`:
+- [x] **Step 1: Copy fonts** from `C:\Users\apiwat\Videos\font` and rename to ASCII `<Family>-<Regular|Bold|Italic|BoldItalic>.ttf`:
   - `THSarabunIT๙*.ttf` → THSarabunIT9
   - `TH NiramitIT๙*.ttf` and `TH Niramit AS-IT๙ Bold Italic.ttf` → THNiramitIT9
   - `thsarabunnew/*` → THSarabunNew
   - `TH-Sarabun-PSK/THSarabun*.ttf` → THSarabunPSK
 
   Add `LICENSE-SIPA.txt` stating the source (SIPA national fonts) and the free-use terms.
-- [ ] **Step 2: Failing test** — every `FONT_FAMILIES × {bold,italic}` combination resolves to an existing file in `fontsDir`, and each file starts with the TrueType magic `00 01 00 00`. `fontFileName('Comic',false,false)` throws `FONT_NOT_FOUND`.
-- [ ] **Step 3: Run** → FAIL
-- [ ] **Step 4: Implement**; set the `files` and `exports` fields (`.` and `./node`, plus `./files/*`).
-- [ ] **Step 5: Run** → PASS
-- [ ] **Step 6: Commit** `feat(fonts): bundle SIPA Thai fonts with manifest`
+- [x] **Step 2: Failing test** — every `FONT_FAMILIES × {bold,italic}` combination resolves to an existing file in `fontsDir`, and each file starts with the TrueType magic `00 01 00 00`. `fontFileName('Comic',false,false)` throws `FONT_NOT_FOUND`.
+- [x] **Step 3: Run** → FAIL
+- [x] **Step 4: Implement**; set the `files` and `exports` fields (`.` and `./node`, plus `./files/*`).
+- [x] **Step 5: Run** → PASS
+- [x] **Step 6: Commit** `feat(fonts): bundle SIPA Thai fonts with manifest`
 
 ### Task 6: Font registry, metrics, shaping
 
