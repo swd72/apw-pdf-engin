@@ -5,3 +5,4 @@
 - **Task 3 (Thai utilities)**: done — no deviations.
 - **Task 4 (Expressions, filters, binding)**: done — no deviations.
 - **Task 5 (Fonts package and providers)**: done — no deviations.
+- **Task 6 (Font registry, metrics, shaping)**: done — no deviations.

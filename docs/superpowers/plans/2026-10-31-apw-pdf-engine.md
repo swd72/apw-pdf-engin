@@ -275,7 +275,7 @@ it('thai dates', () => {
   - `interface ShapedGlyph { id: number; advance: number; dx: number; dy: number; cluster: number }` — pt; cluster = UTF-16 index into `text`
   - `interface ShapedRun { glyphs: ShapedGlyph[]; width: number; missing: string[] }`
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 ```ts
 it('reads TH SarabunIT9 metrics', async () => {
@@ -301,10 +301,10 @@ it('falls back when style file missing', …)   // provider that throws for ital
 it('unknown family → FONT_NOT_FOUND', …)
 ```
 
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement** with `import * as hb from 'harfbuzzjs'` (v1 class API: `new hb.Blob(bytes)`, `new hb.Face(blob)`, `new hb.Font(face)`, `new hb.Buffer()`, `buffer.addText`, `buffer.guessSegmentProperties()`, `hb.shape(font, buffer)`, `buffer.getGlyphInfosAndPositions()`). Glyph `codepoint` holds the glyph id after shaping. Scale = size / upem. Cache shaping by `(fontId, size, text)` in a `Map` per registry. Fonts are cached by family/style; ids are assigned in load order.
-- [ ] **Step 4: Run** → PASS
-- [ ] **Step 5: Commit** `feat(core): font registry, Word-compatible metrics, harfbuzz shaping`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement** with `import * as hb from 'harfbuzzjs'` (v1 class API: `new hb.Blob(bytes)`, `new hb.Face(blob)`, `new hb.Font(face)`, `new hb.Buffer()`, `buffer.addText`, `buffer.guessSegmentProperties()`, `hb.shape(font, buffer)`, `buffer.getGlyphInfosAndPositions()`). Glyph `codepoint` holds the glyph id after shaping. Scale = size / upem. Cache shaping by `(fontId, size, text)` in a `Map` per registry. Fonts are cached by family/style; ids are assigned in load order.
+- [x] **Step 4: Run** → PASS
+- [x] **Step 5: Commit** `feat(core): font registry, Word-compatible metrics, harfbuzz shaping`
 
 ### Task 7: Segmentation and clusters
 
