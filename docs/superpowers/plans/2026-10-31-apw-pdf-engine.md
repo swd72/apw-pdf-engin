@@ -488,17 +488,17 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `interface Engine { fonts: FontRegistry; validate(doc: unknown, data: unknown): { ok: boolean; issues: { path?: string; code: string; message: string }[] }; layout(doc: unknown, data: unknown, opts?: { strict?: boolean }): Promise<LayoutTree> }`
   - `createEngine(opts: { fonts: FontProvider; images?: ImageProvider }): Promise<Engine>` — `validate` runs parse + bind (strict) and collects issues without throwing; `layout` = parse → bind → paginate → page numbers → `LayoutTree` (warnings merged)
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `signature geometry`: `startAt:'center'`, name 'นายสมชาย ใจดี', positions ['ผู้อำนวยการ'] → first glyph of "(" at x = 311.81; the position line's center = the name line's center (±0.01); the name baseline is 4 × 18.08 below the previous baseline when `linesBefore: 4`
   - `signature pulls 3 lines`: fill a page so the signature overflows → the next page holds ≥ 3 body lines before the signature; the previous page ends earlier
   - `page numbers from page 2`: a 2-page doc with `numerals:'thai'` → page 1 has no number; page 2 has glyph text '- ๒ -' centered at x = 311.81, 15pt, top at offset 1.25cm; the page-2 body starts at max(42.52, 35.43 + singleLineHeight(15)) = 52.38 (±0.01)
   - `{pageNumber:true}` and `{pageCount:true}` inline items are resolved after pagination
   - `validate` returns `{ok:false, issues:[{code:'MISSING_VARIABLE', path:'blocks[2].text'}]}` and never throws
   - `layout deterministic`: the same input laid out twice → deep-equal trees
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement**
-- [ ] **Step 4: Run** `pnpm -F @apw-pdf/core exec vitest run --coverage` → PASS, lines ≥ 80%
-- [ ] **Step 5: Commit** `feat(core): signature blocks, page numbers, engine API`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement**
+- [x] **Step 4: Run** `pnpm -F @apw-pdf/core exec vitest run --coverage` → PASS, lines ≥ 80%
+- [x] **Step 5: Commit** `feat(core): signature blocks, page numbers, engine API`
 
 ## Phase B — PDF writer
 

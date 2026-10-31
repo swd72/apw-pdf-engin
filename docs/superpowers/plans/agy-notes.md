@@ -12,3 +12,4 @@
 - **Task 10 (Paragraph layout and LayoutTree types)**: done — no deviations.
 - **Task 11 (Block flow and pagination)**: done — merged contiguous same-style `PlacedRun`s on a line in `placeLine` so each single-style line emits one `glyphs` item.
 - **Task 12 (Tables and columns)**: done — no deviations.
+- **Task 13 (Signature, page numbers, createEngine)**: done — core coverage 86.82% lines; no deviations.
