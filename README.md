@@ -1,0 +1,239 @@
+# APW PDF Engine (`apw-pdf`)
+
+**ระบบสร้างเอกสาร PDF มาตรฐานงานสารบรรณราชการไทย (Thai Government Document PDF Engine)**  
+A TypeScript monorepo that turns declarative JSON templates + data into PDF documents matching Microsoft Word's Thai government document layout (`ระเบียบสำนักนายกรัฐมนตรีว่าด้วยงานสารบรรณ`), usable from Node.js, React (Browser / Web Worker), CLI, and an MCP Server.
+
+---
+
+## โครงสร้างแพ็กเกจ (Packages)
+
+| Package | คำอธิบาย (Description) |
+|---|---|
+| `@apw-pdf/core` | Pure TypeScript layout engine: units, schema, data binding/filters, HarfBuzz shaping, Thai segmentation, line breaking, Thai Distributed alignment, pagination, and `LayoutTree` generation (no `fs` or DOM). |
+| `@apw-pdf/fonts` | SIPA Thai national fonts (`THSarabunIT9`, `THSarabunNew`, `THSarabunPSK`, `THNiramitIT9`) + manifest and Node path resolver. |
+| `@apw-pdf/pdf` | Pure TypeScript PDF writer: retain-GID `hb-subset` Wasm font subsetting, `CIDFontType2` / `Identity-H` embedding, `/ToUnicode` CMap generation, and `pdf-lib` rendering. |
+| `@apw-pdf/templates` | Builtin Thai government templates (`memo`, `external-letter`, `leave-sick-personal-maternity`, `leave-vacation`) with typed builders and JSON schemas. |
+| `@apw-pdf/node` | Node.js renderer (`createRenderer`), filesystem/remote providers with path-traversal and SSRF guards, and `apw-pdf` CLI. |
+| `@apw-pdf/react` | React hooks and components (`<ApwPdfProvider>`, `usePdf`, `<PdfPreview>`, `<PdfDownloadButton>`) with Web Worker rendering. |
+| `@apw-pdf/raster` | PDF page rasterizer (`rasterizePage`) using `pdfjs-dist` + `@napi-rs/canvas` for visual regression and AI inspection. |
+| `@apw-pdf/mcp` | Model Context Protocol (MCP) server for AI assistants to author, validate, render, and visually inspect Thai government PDFs. |
+
+---
+
+## การติดตั้ง (Installation)
+
+```bash
+# Node.js / Backend / CLI
+pnpm add @apw-pdf/node @apw-pdf/templates
+
+# React / Browser
+pnpm add @apw-pdf/react @apw-pdf/templates @apw-pdf/fonts react react-dom
+
+# Monorepo Development
+pnpm install
+pnpm build
+pnpm test
+```
+
+---
+
+## เริ่มต้นใช้งานตามสภาพแวดล้อม (Quick Start per Environment)
+
+### 1. Node.js (`@apw-pdf/node`)
+
+```ts
+import { createRenderer } from '@apw-pdf/node'
+import { memo } from '@apw-pdf/templates'
+
+const renderer = await createRenderer()
+
+// Render using template builder
+const { doc, data } = memo.build({
+  agency: 'กองเทคโนโลยีดิจิทัล โทร. ๐ ๒๑๒๓ ๔๕๖๗',
+  docNo: 'นร ๐๑๐๑/๑๒๓',
+  date: '2026-10-31',
+  subject: 'ขออนุมัติจัดซื้อวัสดุสำนักงาน',
+  to: 'ผู้อำนวยการกองเทคโนโลยีดิจิทัล',
+  body: [
+    'ด้วยฝ่ายบริหารทั่วไปมีความจำเป็นต้องจัดซื้อวัสดุสำนักงานเพื่อใช้ในการปฏิบัติราชการประจำไตรมาสที่ ๑',
+    'จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติ',
+  ],
+  signer: {
+    name: 'นายสมชาย ใจดี',
+    positions: ['นักวิชาการคอมพิวเตอร์ชำนาญการ'],
+  },
+})
+
+await renderer.renderToFile(doc, data, './memo.pdf')
+```
+
+### 2. CLI (`apw-pdf`)
+
+```bash
+# ดูรายชื่อเทมเพลตมาตรฐาน
+apw-pdf templates
+
+# ตรวจสอบข้อมูลกับเทมเพลต
+apw-pdf validate memo data.json
+
+# เรนเดอร์เป็นไฟล์ PDF
+apw-pdf render memo data.json -o out.pdf
+```
+
+### 3. React / Vite (`@apw-pdf/react`)
+
+คัดลอกไฟล์ฟอนต์จาก `@apw-pdf/fonts/files/*.ttf` และ `harfbuzzjs/dist/harfbuzz-subset.wasm` ไปไว้ใน `public/` และตั้งค่า `optimizeDeps.exclude: ['harfbuzzjs']` ใน `vite.config.ts`:
+
+```tsx
+import { ApwPdfProvider, PdfPreview, PdfDownloadButton } from '@apw-pdf/react'
+import { memo } from '@apw-pdf/templates'
+
+export function MemoScreen() {
+  return (
+    <ApwPdfProvider fontBaseUrl="/fonts" wasmUrl="/harfbuzz-subset.wasm" worker>
+      <PdfDownloadButton doc={memo.document} data={memo.example} fileName="memo.pdf">
+        ดาวน์โหลด PDF
+      </PdfDownloadButton>
+      <PdfPreview doc={memo.document} data={memo.example} scale={1} />
+    </ApwPdfProvider>
+  )
+}
+```
+
+### 4. MCP Server (`@apw-pdf/mcp`) สำหรับ Claude Desktop / Claude Code
+
+เพิ่มการตั้งค่าใน `claude_desktop_config.json` หรือ `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "apw-pdf": {
+      "command": "node",
+      "args": ["C:/project/apw-pdf-engin/packages/mcp/bin/apw-pdf-mcp.js"],
+      "env": {
+        "APW_PDF_OUTPUT_DIR": "C:/project/apw-pdf-engin/out",
+        "APW_PDF_TEMPLATE_DIR": "C:/project/apw-pdf-engin/saved-templates"
+      }
+    }
+  }
+}
+```
+
+---
+
+## คู่มือการเขียนเทมเพลต (Template Authoring Guide)
+
+### หน่วยวัด (Units)
+- รองรับ `"pt"`, `"mm"`, `"cm"`, `"in"` หรือตัวเลขล้วน (หมายถึง `pt`)
+- `1 in = 72 pt`, `1 cm = 28.346456692913385 pt`, `1 mm = 2.8346456692913385 pt`
+- กระดาษ A4 = `595.28 × 841.89 pt`
+
+### ชนิดของบล็อก (Blocks)
+- `paragraph`: ย่อหน้าข้อความ (`text` หรือ `runs`), รองรับ `style.align` (`left`, `center`, `right`, `justify`, `thaiDistributed`), `firstLineIndent`, `leftIndent`, `rightIndent`, `spaceBefore`, `spaceAfter`, `lineSpacing`, `keepWithNext`, `keepTogether`, `tabs`
+- `image`: รูปภาพ (`src: "asset:garuda"` หรือ data URL / path ภายใต้ `baseDir`), กำหนด `width`/`height` และ `align`
+- `columns`: แบ่งคอลัมน์ซ้าย-ขวา เช่น ที่หนังสือและสถานที่ตั้งส่วนราชการในหนังสือภายนอก
+- `table`: ตารางข้อมูล รองรับ `columns` (% หรือความยาว), `header`, `repeatHeader: true` เมื่อตารางข้ามหน้า, เส้นขอบและ padding
+- `signature`: บล็อกลงนาม (`closing`, `name`, `positions`, `left`, `width`, `minLinesBefore: 3` ป้องกันลายเซ็นหลุดเดี่ยวไปหน้าถัดไป)
+- `spacer`, `line`, `pageBreak`, `each` (วนลูปอาร์เรย์), `if` (เงื่อนไขปลอดภัย ไม่ใช้ `eval`)
+
+### ตัวกรองข้อมูล (Filters)
+- `{{date | thaiDate:'long'}}` → `31 ตุลาคม 2569` (`'full'` มีคำว่า `พ.ศ.`, `'short'` เดือนย่อ)
+- `{{amount | baht}}` → จำนวนเงินตัวอักษรไทย (`หนึ่งร้อยบาทถ้วน`)
+- `{{amount | number:2}}` → `1,234.50`
+- `{{text | thaiDigits}}` / `{{text | arabicDigits}}` → แปลงเลขไทย/อารบิก
+- `{{val | default:'-'}}` → ค่าเริ่มต้นเมื่อตัวแปรว่าง
+
+### จุดอ้างอิงแนวตั้งข้ามบรรทัด (Anchors `@name` & Tabs)
+ในบันทึกข้อความราชการ คำว่า **"วันที่"** ต้องมีตำแหน่งแนวนอน (`x`) ตรงกับตัวอักษร **"ข"** ของคำว่า **"ข้อความ"** ในหัวเรื่อง `"บันทึกข้อความ"` สามารถวาง `{ "anchor": "kho" }` หน้าคำว่า `"ข้อความ"` แล้วใช้ `{ "tab": true, "to": "@kho" }` ในบรรทัด `"ที่ ... วันที่ ..."` ได้โดยตรง:
+
+```json
+{
+  "version": 1,
+  "page": {
+    "size": "A4",
+    "margin": { "top": "1.5cm", "bottom": "2cm", "left": "3cm", "right": "2cm" },
+    "pageNumber": { "from": 2, "format": "- {n} -", "size": "15pt", "offset": "1.25cm" }
+  },
+  "font": { "family": "THSarabunIT9", "size": "16pt" },
+  "blocks": [
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "width": "2cm",
+          "blocks": [{ "type": "image", "src": "asset:garuda", "height": "1.5cm", "align": "left" }]
+        },
+        {
+          "width": "12cm",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": { "align": "center", "spaceBefore": "13.5pt" },
+              "runs": [
+                { "text": "บันทึก", "bold": true, "size": "29pt" },
+                { "anchor": "kho" },
+                { "text": "ข้อความ", "bold": true, "size": "29pt" }
+              ]
+            }
+          ]
+        },
+        { "width": "2cm", "blocks": [] }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "runs": [
+        { "text": "ส่วนราชการ ", "bold": true, "size": "20pt" },
+        { "text": "{{agency}}" },
+        { "fill": "dot", "width": "toEnd" }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "runs": [
+        { "text": "ที่ ", "bold": true, "size": "20pt" },
+        { "text": "{{docNo}}" },
+        { "tab": true, "to": "@kho", "leader": "dot" },
+        { "text": "วันที่ ", "bold": true, "size": "20pt" },
+        { "text": "{{date | thaiDate:'long'}}" },
+        { "fill": "dot", "width": "toEnd" }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## ตารางค่ามาตรฐานงานสารบรรณราชการไทย (§3 Standards Table)
+
+| รายการ | ค่ามาตรฐาน |
+|---|---|
+| กระดาษ | A4 (`210 × 297 mm` = `595.28 × 841.89 pt`) |
+| ขอบกระดาษ | บน `2.5 cm` (หน้าแรกที่มีครุฑเริ่มที่ `1.5 cm`), ล่าง `2 cm`, ซ้าย `3 cm`, ขวา `2 cm` |
+| ฟอนต์มาตรฐาน | `THSarabunIT9` / `THSarabunNew` ขนาด `16 pt` |
+| ครุฑ (บันทึกข้อความ) | สูง `1.5 cm` (`42.52 pt`) ชิดซ้าย (`x = 85.04 pt`, `y = 42.52 pt`) |
+| ครุฑ (หนังสือภายนอก) | สูง `3 cm` (`85.04 pt`) กึ่งกลางหน้า (`x + w/2 = 311.81 pt`, `y = 42.52 pt`) |
+| หัวเรื่อง "บันทึกข้อความ" | `29 pt` หนา กึ่งกลาง ฐานตัวอักษรระดับเดียวกับฐานครุฑ |
+| หัวข้อ ส่วนราชการ/ที่/วันที่/เรื่อง | `20 pt` หนา; ข้อความข้อมูล `16 pt` |
+| ย่อหน้าเนื้อหา | ย่อหน้าบรรทัดแรก `2.5 cm` (`70.87 pt`), จัดกระจายแบบไทย (`thaiDistributed`) |
+| คำลงท้าย (หนังสือภายนอก) | `"ขอแสดงความนับถือ"` ที่กึ่งกลางพื้นที่พิมพ์ (`x = 311.81 pt`), `spaceBefore: 12pt` |
+| บล็อกลายเซ็น | เว้นบรรทัดว่างก่อนชื่อผู้ลงนาม, `minLinesBefore: 3` |
+| หมายเลขหน้า | `"- {n} -"` ขนาด `15 pt` กึ่งกลางด้านบน ห่างขอบบน `1.25 cm` เริ่มหน้า 2 |
+
+---
+
+## ข้อจำกัดที่ทราบ (Known Limitation)
+
+- **การตัดคำภาษาไทยเทียบกับ Microsoft Word**: ระบบใช้ `Intl.Segmenter('th', { granularity: 'word' })` ร่วมกับกฎวรรคตอนราชการไทยและพจนานุกรมคำเฉพาะต่อเอกสาร (`document.dictionary`) ในบางกรณีที่พบได้ยาก พจนานุกรมภายในของ Microsoft Word อาจตัดคำต่างจาก `Intl.Segmenter` เล็กน้อย สามารถระบุคำเฉพาะเพิ่มเติมในฟิลด์ `dictionary: ["คำเฉพาะ"]` ของเทมเพลตเพื่อบังคับไม่ให้แยกคำได้
+
+---
+
+## ขั้นตอนการปรับเทียบระยะบรรทัดกับ Microsoft Word (Line-Height Calibration Procedure)
+
+หากต้องการปรับเทียบระยะบรรทัด (`Single` line spacing) กับฟอนต์ใหม่ให้ตรงกับ Microsoft Word ระดับ `0.01 pt`:
+
+1. เปิด Microsoft Word ตั้งค่าหน้ากระดาษ A4 ขอบบน `2.5 cm` ซ้าย `3 cm` ฟอนต์เป้าหมายขนาด `16 pt` ระยะบรรทัด `Single` (`spaceBefore = 0`, `spaceAfter = 0`)
+2. พิมพ์ข้อความทดสอบ 5 บรรทัดแล้วส่งออกเป็นไฟล์ PDF จาก Word
+3. อ่านค่าพิกัด `y` ของ baseline แต่ละบรรทัดจากไฟล์ PDF ของ Word เพื่อคำนวณระยะห่างระหว่างบรรทัด ($\Delta y$)
+4. ตรวจสอบและปรับสูตรอ่านค่า `usWinAscent`, `usWinDescent`, `sTypoLineGap` ในไฟล์ [`packages/core/src/fonts/metrics.ts`](packages/core/src/fonts/metrics.ts) (`readFontMetrics` และ `lineBox`) แล้วรันชุดทดสอบ `pnpm -F @apw-pdf/core test`

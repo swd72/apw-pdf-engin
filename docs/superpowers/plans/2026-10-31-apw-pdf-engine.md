@@ -763,8 +763,8 @@ it('unknown family → FONT_NOT_FOUND', …)
 
 **Interfaces:** Consumes the public APIs of `node`, `react`, and `templates` only.
 
-- [ ] **Step 1: Express example:** `POST /pdf/:template` with a JSON body → `application/pdf`; a 400 with `{code, path}` on ApwPdfError; and `GET /templates`.
-- [ ] **Step 2: Vite React example.** A form for the memo fields, with `<PdfPreview>` live preview and `<PdfDownloadButton>`. A copy script puts the fonts and `harfbuzz-subset.wasm` in `public/`, and the Vite config sets `optimizeDeps.exclude: ['harfbuzzjs']`.
-- [ ] **Step 3: README:** install steps, a quick start per environment, a template authoring guide (blocks, units, filters, anchors) with the memo as a worked example, an MCP config snippet for Claude Desktop/Code, the standards table, the known limitation (line breaks may differ from Word's dictionary in rare cases), and the line-height calibration procedure (export the same text from Word, compare baselines, adjust `metrics.ts`).
-- [ ] **Step 4: Verify the whole repo:** `pnpm install && pnpm lint && pnpm build && pnpm test` → all green, and each package's coverage ≥ 80%. Run `pnpm --filter express-server start`, POST the memo example, and open the resulting PDF.
-- [ ] **Step 5: Commit** `docs: examples and README for apw-pdf`
+- [x] **Step 1: Express example:** `POST /pdf/:template` with a JSON body → `application/pdf`; a 400 with `{code, path}` on ApwPdfError; and `GET /templates`.
+- [x] **Step 2: Vite React example.** A form for the memo fields, with `<PdfPreview>` live preview and `<PdfDownloadButton>`. A copy script puts the fonts and `harfbuzz-subset.wasm` in `public/`, and the Vite config sets `optimizeDeps.exclude: ['harfbuzzjs']`.
+- [x] **Step 3: README:** install steps, a quick start per environment, a template authoring guide (blocks, units, filters, anchors) with the memo as a worked example, an MCP config snippet for Claude Desktop/Code, the standards table, the known limitation (line breaks may differ from Word's dictionary in rare cases), and the line-height calibration procedure (export the same text from Word, compare baselines, adjust `metrics.ts`).
+- [x] **Step 4: Verify the whole repo:** `pnpm install && pnpm lint && pnpm build && pnpm test` → all green, and each package's coverage ≥ 80%. Run `pnpm --filter express-server start`, POST the memo example, and open the resulting PDF.
+- [x] **Step 5: Commit** `docs: examples and README for apw-pdf`

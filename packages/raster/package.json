@@ -26,9 +26,10 @@
   },
   "devDependencies": {
     "@apw-pdf/core": "workspace:*",
-    "@apw-pdf/node": "workspace:*",
-    "@apw-pdf/templates": "workspace:*",
+    "@apw-pdf/fonts": "workspace:*",
+    "@apw-pdf/pdf": "workspace:*",
     "@types/node": "^22.13.10",
+    "harfbuzzjs": "1.6.4",
     "tsup": "^8.4.0",
     "typescript": "^5.8.2",
     "vitest": "^3.0.9"

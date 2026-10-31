@@ -1,5 +1,23 @@
 # AGY Implementation Notes
 
+## Final Result Summary
+
+- **Tasks Completed**: 23 / 23 (Tasks 1–23 done, 0 blocked)
+- **Verification (`pnpm lint && pnpm build && pnpm test`)**: All passed (0 lint errors, all 10 packages/examples built cleanly, 28 test suites / 162 tests passed)
+- **Line Coverage per Package (threshold ≥ 80%)**:
+  - `@apw-pdf/core`: **86.82%** (97 tests)
+  - `@apw-pdf/fonts`: **100.00%** (2 tests)
+  - `@apw-pdf/pdf`: **89.43%** (11 tests)
+  - `@apw-pdf/templates`: **98.70%** (`src`) / **91.85%** (all) (24 tests)
+  - `@apw-pdf/node`: **82.98%** (8 tests)
+  - `@apw-pdf/raster`: **81.57%** (3 tests)
+  - `@apw-pdf/react`: **82.41%** (9 tests)
+  - `@apw-pdf/mcp`: **85.92%** (8 tests)
+
+---
+
+## Task-by-Task Log
+
 - **Task 1 (Workspace scaffold, errors, units)**: done — no deviations; added `allowBuilds: { esbuild: true }` to `pnpm-workspace.yaml` for pnpm 12 build approval.
 - **Task 2 (Document schema)**: done — no deviations.
 - **Task 3 (Thai utilities)**: done — no deviations.
@@ -22,3 +40,4 @@
 - **Task 20 (`@apw-pdf/raster` and visual regression)**: done — `@apw-pdf/raster` coverage 81.57% lines. Visual check of golden PNGs (`memo.png`, `external-letter.png`, `leave-sick-personal-maternity.png`, `leave-vacation.png`): `memo.png` has 1.5cm Garuda at top-left, 29pt centered `"บันทึกข้อความ"`, 20pt bold header labels with dotted leaders to right margin, `"วันที่"` aligned under `"ข"`, 2.5cm indented Thai-distributed body, and centered signature; `external-letter.png` has 3cm centered Garuda, left docNo and right-flushed left-aligned address block, centered date and closing, and bottom-left ownerUnit; during visual inspection of the leave forms, spotted that `toEnd` fills on `firstLineIndent` lines wrapped because `naturalWidth` used `indentLeftX` instead of `indentLeftX + firstLineIndent` on line 0 — fixed in `linebreak.ts`/`paragraph.ts` and regenerated crisp single-line goldens.
 - **Task 21 (`@apw-pdf/react`)**: done — `@apw-pdf/react` coverage 82.41% lines; no deviations.
 - **Task 22 (`@apw-pdf/mcp`)**: done — `@apw-pdf/mcp` coverage 85.92% lines; no deviations.
+- **Task 23 (Examples, README, full verification)**: done — created `examples/express-server`, `examples/vite-react`, root `README.md`, and `packages/*/README.md`; verified `express-server` (`GET /templates` -> 200, `POST /pdf/memo` -> 200 `application/pdf`, invalid body -> 400 `{code, path}`) and full workspace `pnpm lint && pnpm build && pnpm test`.

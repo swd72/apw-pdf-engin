@@ -1,0 +1,21 @@
+{
+  "name": "express-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsup server.ts --format esm --clean",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@apw-pdf/node": "workspace:*",
+    "@apw-pdf/templates": "workspace:*",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.10",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0"
+  }
+}
