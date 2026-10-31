@@ -1,0 +1,40 @@
+{
+  "name": "@apw-pdf/node",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "apw-pdf": "./bin/apw-pdf.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@apw-pdf/core": "workspace:*",
+    "@apw-pdf/fonts": "workspace:*",
+    "@apw-pdf/pdf": "workspace:*",
+    "@apw-pdf/templates": "workspace:*",
+    "harfbuzzjs": "1.6.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}

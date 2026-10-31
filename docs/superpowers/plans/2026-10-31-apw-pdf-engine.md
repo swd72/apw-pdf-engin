@@ -665,16 +665,16 @@ it('unknown family → FONT_NOT_FOUND', …)
     - `apw-pdf validate <template|name> <data.json>` — exit 1 on issues, printing `path code message`
     - `apw-pdf templates` — lists names and descriptions
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `render memo by name` → bytes start with `%PDF-`; `renderToFile` writes the file
   - `path traversal`: `imageBaseDir: tmp`, src `'../../etc/passwd'` → `IMAGE_NOT_ALLOWED`
   - `remote image blocked by default`: src `'http://169.254.169.254/x.png'` → `IMAGE_NOT_ALLOWED`; with an allowlist containing a local test-server host → loads (spin up `http.createServer` on 127.0.0.1)
   - `CLI`: running `node bin/apw-pdf.js validate memo bad.json` exits with code 1 and prints `MISSING_VARIABLE`
   - `performance`: after one warm-up render, the memo example renders in < 200 ms (median of 5); a 20-page memo in < 1500 ms. Mark these with `test.skipIf(process.env.CI_SLOW)`.
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement**
-- [ ] **Step 4: Run** → PASS
-- [ ] **Step 5: Commit** `feat(node): fs providers with SSRF/traversal guards, renderer, CLI`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement**
+- [x] **Step 4: Run** → PASS
+- [x] **Step 5: Commit** `feat(node): fs providers with SSRF/traversal guards, renderer, CLI`
 
 ### Task 20: `@apw-pdf/raster` and visual regression
 
