@@ -630,17 +630,17 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `templates: Record<string, TemplateDef>` keyed by `memo`, `external-letter`, `leave-sick-personal-maternity`, `leave-vacation`
   - The input interfaces list the spec §9.3 fields: `writtenAt`, `date`, `subject`, `to`, `name`, `position`, `level`, `affiliation`, `leaveType: 'sick'|'personal'|'maternity'`, `reason`, `from`, `toDate`, `days`, `lastLeave?: { type; from; to; days }`, `contact`, `stats: { type; taken; thisTime; total }[]`, `checker?`, `supervisor?: { opinion; name; position }`, `approver?: { approved?: boolean; name; position }`; for vacation, `accumulatedDays`, `currentYearDays`, `totalDays`, `substitute?: { name }`
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - every template's `example` renders without warnings
   - with all optional fields empty, the dotted leaders still render (each `fill` emits a dotted `line` item of the expected width)
   - `leaveType:'sick'` → the first checkbox is ☑ and the others ☐
   - the stats table has a header row 'ประเภทลา | ลามาแล้ว | ลาครั้งนี้ | รวมเป็น' and 3 body rows
   - each form fits on 1 page with the example data
   - `templates` has exactly 4 keys, and every `example` validates against its `dataSchema` (use a tiny JSON Schema check: required + type only)
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement**
-- [ ] **Step 4: Run** `pnpm -F @apw-pdf/templates exec vitest run --coverage` → PASS
-- [ ] **Step 5: Commit** `feat(templates): ใบลาป่วย/กิจ/คลอด and ใบลาพักผ่อน templates`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement**
+- [x] **Step 4: Run** `pnpm -F @apw-pdf/templates exec vitest run --coverage` → PASS
+- [x] **Step 5: Commit** `feat(templates): ใบลาป่วย/กิจ/คลอด and ใบลาพักผ่อน templates`
 
 ## Phase D — Node, raster
 

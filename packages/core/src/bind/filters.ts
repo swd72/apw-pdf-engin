@@ -8,7 +8,12 @@ export const FILTERS: Record<string, (value: unknown, ...args: (string | number)
   number: (value, decimals = 2) => formatNumber(value as number | string, Number(decimals)),
   thaiNum: (value) => toThaiDigits(String(value ?? '')),
   thaiDate: (value, style = 'long') =>
-    formatThaiDate(value as Date | string, String(style) as 'long' | 'short' | 'monthYear'),
+    value === ''
+      ? ''
+      : formatThaiDate(
+          value as Date | string,
+          String(style) as 'long' | 'short' | 'monthYear',
+        ),
   upper: (value) => String(value ?? '').toUpperCase(),
   lower: (value) => String(value ?? '').toLowerCase(),
   default: (value, fallback = '') =>
