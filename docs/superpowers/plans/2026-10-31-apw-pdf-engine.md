@@ -348,7 +348,7 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `interface BrokenLine { items: InlineItem[]; isLast: boolean; endsWithBreak: boolean }`
   - `breakLines(items: InlineItem[], widthFor: (lineIndex: number) => number, measureTabs: (items: InlineItem[]) => number): { lines: BrokenLine[]; warnings: Warning[] }` — `measureTabs` returns the natural width with tabs resolved (provided by Task 9's `naturalWidth`)
 
-- [ ] **Step 1: Failing tests** (use THSarabunIT9 16pt)
+- [x] **Step 1: Failing tests** (use THSarabunIT9 16pt)
   - `fills greedily`: 30 repetitions of `'ทดสอบ '` with width 200pt → each line's natural width ≤ 200, and adding the next word would exceed it
   - `trailing spaces hang`: a line ending in a space is not broken early because of that space; the space item is dropped from the line end
   - `forced break` (Review Focus 3): `'https://example.go.th/very/long/path/without/spaces'` in 40pt → several lines, each ≤ 40pt, broken at grapheme boundaries, with warning `FORCED_BREAK`
@@ -356,10 +356,10 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `first line width`: `widthFor(0)=100`, `widthFor(n>0)=200` is respected
   - `mixed runs`: bold run + regular run are shaped with their own fonts; `items[i].font.bold` matches the run
   - `empty paragraph` (Review Focus 1): `text:''` → exactly 1 line with 0 items
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement.** One word item per segment token per run; whitespace → space item. Word Thai leading punctuation stays attached because Task 7 already glued it.
-- [ ] **Step 4: Run** → PASS
-- [ ] **Step 5: Commit** `feat(core): inline items and greedy Thai line breaking`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement.** One word item per segment token per run; whitespace → space item. Word Thai leading punctuation stays attached because Task 7 already glued it.
+- [x] **Step 4: Run** → PASS
+- [x] **Step 5: Commit** `feat(core): inline items and greedy Thai line breaking`
 
 ### Task 9: Line placement — alignment, tabs, anchors, Thai Distributed
 

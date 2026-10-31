@@ -7,3 +7,4 @@
 - **Task 5 (Fonts package and providers)**: done — no deviations.
 - **Task 6 (Font registry, metrics, shaping)**: done — no deviations.
 - **Task 7 (Segmentation and clusters)**: done — no deviations.
+- **Task 8 (Inline items and line breaking)**: done — no deviations.
