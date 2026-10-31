@@ -624,5 +624,33 @@ export function placeLine(
     }
   }
 
-  return Object.assign(runs, { runs, shapes })
+  const mergedRuns: PlacedRun[] = []
+  for (const r of runs) {
+    const prev = mergedRuns.length > 0 ? mergedRuns[mergedRuns.length - 1] : undefined
+    if (
+      prev &&
+      prev.font.id === r.font.id &&
+      prev.size === r.size &&
+      prev.color === r.color &&
+      prev.underline === r.underline &&
+      prev.tokenKind === undefined &&
+      r.tokenKind === undefined
+    ) {
+      const prevW = prev.glyphs.reduce((s, g) => s + g.advance, 0)
+      if (Math.abs(prev.x + prevW - r.x) < 1e-3) {
+        const textOffset = prev.text.length
+        prev.text += r.text
+        prev.glyphs.push(...r.glyphs)
+        prev.clusters.push(...r.clusters.map((c) => c + textOffset))
+        continue
+      }
+    }
+    mergedRuns.push({
+      ...r,
+      glyphs: [...r.glyphs],
+      clusters: [...r.clusters],
+    })
+  }
+
+  return Object.assign(mergedRuns, { runs: mergedRuns, shapes })
 }

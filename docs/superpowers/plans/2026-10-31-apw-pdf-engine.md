@@ -428,7 +428,7 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `paginate(blocks: ResolvedBlock[], ctx: FlowContext): Promise<LayoutPage[]>` — handles paragraph, spacer, line, pageBreak, image (inline and anchored); delegates table/columns/signature through a `layoutBlock` dispatch, which Tasks 12–13 register
   - `interface Fragment { height: number; spaceBefore: number; spaceAfter: number; items(yTop: number): LayoutItem[]; splittable: false } | { …splittable: true; split(avail: number): [Fragment, Fragment] | null; minHeadLines; … }` — the internal flow unit that tables and signatures also produce
 
-- [ ] **Step 1: Failing tests** (A4, gov margins, bodyTop = margin top)
+- [x] **Step 1: Failing tests** (A4, gov margins, bodyTop = margin top)
   - `flows to second page`: 80 paragraphs of 1 line → page count 2; first item on page 2 at y = 42.52 + ascent
   - `drops spaceBefore at top after auto break, keeps after pageBreak`
   - `widow/orphan`: a 5-line paragraph with room for 1 line → all 5 move to the next page; room for 3 → 3 + 2; room for 4 → 3 + 2 (never leaves 1 widow line)
@@ -440,10 +440,10 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `line`: `{type:'line', style:'dashed', thickness:'1pt'}` → a `line` item spanning contentLeft..contentRight with `dash` set
   - `BLOCK_TOO_TALL`: a 30cm image → error with `path:'blocks[0]'`
   - `500-page limit` → `LIMIT_EXCEEDED`; image > 10 MB → `LIMIT_EXCEEDED`
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement.** Y grows downward from the page top (the writer flips it). Glyph item `y` = baseline.
-- [ ] **Step 4: Run** → PASS
-- [ ] **Step 5: Commit** `feat(core): block flow pagination with keeps and widow control`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement.** Y grows downward from the page top (the writer flips it). Glyph item `y` = baseline.
+- [x] **Step 4: Run** → PASS
+- [x] **Step 5: Commit** `feat(core): block flow pagination with keeps and widow control`
 
 ### Task 12: Tables and columns
 

@@ -88,8 +88,8 @@ describe('line placement: alignment, tabs, anchors, Thai Distributed', () => {
     const lastRun = placed[placed.length - 1]!
     const endX = lastRun.x + lastRun.glyphs.reduce((s, g) => s + g.advance, 0)
     expect(endX).toBeCloseTo(200, 2)
-    // Word runs keep their natural width; only space advances grew
-    expect(placed[0]!.glyphs.reduce((s, g) => s + g.advance, 0)).toBeCloseTo(
+    // Word glyphs keep their natural advance; only space glyphs grew
+    expect(placed[0]!.glyphs[0]!.advance + placed[0]!.glyphs[1]!.advance).toBeCloseTo(
       items[0]!.width,
       4,
     )
@@ -139,16 +139,17 @@ describe('line placement: alignment, tabs, anchors, Thai Distributed', () => {
 
     // Verify space vs cluster gap growth ratio is 4:1
     const spaceItemOrig = line0.items.find((it) => it.kind === 'space')!
-    const spaceRunIdx = line0.items.indexOf(spaceItemOrig)
-    const spacePlaced = runs[spaceRunIdx]!
-    const spaceGrowth = spacePlaced.glyphs[0]!.advance - spaceItemOrig.width
+    const spaceOrigW = spaceItemOrig.width
+    const spaceCharIdx = runs[0]!.text.indexOf(' ')
+    const spaceGlyphIdx = runs[0]!.clusters.indexOf(spaceCharIdx)
+    const spaceGrowth = runs[0]!.glyphs[spaceGlyphIdx]!.advance - spaceOrigW
 
     const firstWordOrig = line0.items[0]! as Extract<InlineItem, { kind: 'word' }>
     const firstClusterOrigAdv = firstWordOrig.shaped.glyphs
       .filter((g) => g.cluster === 0)
       .reduce((s, g) => s + g.advance, 0)
     const firstClusterPlacedAdv = runs[0]!.glyphs
-      .filter((_, idx) => firstWordOrig.shaped.glyphs[idx]!.cluster === 0)
+      .filter((_, idx) => runs[0]!.clusters[idx] === 0)
       .reduce((s, g) => s + g.advance, 0)
     const clusterGrowth = firstClusterPlacedAdv - firstClusterOrigAdv
     expect(spaceGrowth / clusterGrowth).toBeCloseTo(4, 3)

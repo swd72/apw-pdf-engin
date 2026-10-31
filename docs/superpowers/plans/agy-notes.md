@@ -10,3 +10,4 @@
 - **Task 8 (Inline items and line breaking)**: done — no deviations.
 - **Task 9 (Line placement — alignment, tabs, anchors, Thai Distributed)**: done — no deviations.
 - **Task 10 (Paragraph layout and LayoutTree types)**: done — no deviations.
+- **Task 11 (Block flow and pagination)**: done — merged contiguous same-style `PlacedRun`s on a line in `placeLine` so each single-style line emits one `glyphs` item.
