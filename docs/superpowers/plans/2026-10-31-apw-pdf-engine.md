@@ -605,7 +605,7 @@ it('unknown family → FONT_NOT_FOUND', …)
 **Interfaces:**
 - Produces: `externalLetter: TemplateDef & { build(input: ExternalLetterInput) }`, where `interface ExternalLetterInput { docNo: string; agencyAddress: string[]; date: Date | string; subject: string; salutation: string; to: string; reference?: string; enclosures?: string[]; body: string[]; closing?: string; signer: { name; positions: string[]; signatureUrl? }; ownerUnit: { name: string; phone?: string; fax?: string; email?: string } }`
 
-- [ ] **Step 1: Failing conformance tests:**
+- [x] **Step 1: Failing conformance tests:**
   - garuda h = 85.0394, centered (x + w/2 = 311.811), y = 42.5197
   - the 'ที่' run x = 85.04
   - the address block's longest line ends at 538.58 ± 0.05, and all its lines share the same left x
@@ -614,10 +614,10 @@ it('unknown family → FONT_NOT_FOUND', …)
   - the closing 'ขอแสดงความนับถือ' starts at 311.81 with spaceBefore 12pt
   - the signer name baseline = closing baseline + 2 × single(16)
   - the ownerUnit lines start at 85.04 after the signature
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement** per spec §9.2
-- [ ] **Step 4: Run** → PASS
-- [ ] **Step 5: Commit** `feat(templates): หนังสือภายนอก template with conformance tests`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement** per spec §9.2
+- [x] **Step 4: Run** → PASS
+- [x] **Step 5: Commit** `feat(templates): หนังสือภายนอก template with conformance tests`
 
 ### Task 18: ใบลา (leave forms)
 

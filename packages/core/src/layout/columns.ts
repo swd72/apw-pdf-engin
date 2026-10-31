@@ -34,14 +34,60 @@ export async function layoutColumns(
     const placements: { frag: Fragment; offsetTop: number }[] = []
     let currY = 0
 
+    const isRightAlignedBlock =
+      col.blocks.length > 0 &&
+      col.blocks.every((b) => b.type === 'paragraph' && b.align === 'right')
+
     for (let bIdx = 0; bIdx < col.blocks.length; bIdx++) {
       const blk = col.blocks[bIdx]!
+      const effectiveBlk =
+        isRightAlignedBlock && blk.type === 'paragraph'
+          ? { ...blk, align: 'left' as const }
+          : blk
       const blkPath = `${path}.columns[${i}].blocks[${bIdx}]`
-      const res = await layoutBlockToFragment(blk, ctx, colX, colW, blkPath)
+      const res = await layoutBlockToFragment(effectiveBlk, ctx, colX, colW, blkPath)
       if (res.fragment) {
         const topOff = currY + (bIdx === 0 ? 0 : res.fragment.spaceBefore)
-        placements.push({ frag: res.fragment, offsetTop: topOff })
-        currY = topOff + res.fragment.height + res.fragment.spaceAfter
+        const frag = res.fragment
+        placements.push({ frag, offsetTop: topOff })
+        currY = topOff + frag.height + frag.spaceAfter
+      }
+    }
+
+    if (isRightAlignedBlock && placements.length > 0) {
+      let maxLineRight = colX
+      for (const p of placements) {
+        for (const it of p.frag.items(0)) {
+          if (it.kind === 'glyphs') {
+            const w = it.glyphs.reduce((s, g) => s + g.advance, 0)
+            if (it.x + w > maxLineRight) {
+              maxLineRight = it.x + w
+            }
+          }
+        }
+      }
+      const shiftX = Math.max(0, colX + colW - maxLineRight)
+      if (shiftX > 0) {
+        for (let pIdx = 0; pIdx < placements.length; pIdx++) {
+          const origFrag = placements[pIdx]!.frag
+          placements[pIdx] = {
+            offsetTop: placements[pIdx]!.offsetTop,
+            frag: {
+              ...origFrag,
+              items(yTop: number): LayoutItem[] {
+                return origFrag.items(yTop).map((it) => {
+                  if (it.kind === 'glyphs' || it.kind === 'rect' || it.kind === 'image') {
+                    return { ...it, x: it.x + shiftX }
+                  }
+                  if (it.kind === 'line') {
+                    return { ...it, x1: it.x1 + shiftX, x2: it.x2 + shiftX }
+                  }
+                  return it
+                })
+              },
+            },
+          }
+        }
       }
     }
 
