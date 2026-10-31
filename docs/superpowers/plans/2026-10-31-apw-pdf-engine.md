@@ -165,7 +165,7 @@ it('swaps for landscape', () => {
   - `formatNumber(value: number | string, decimals: number): string` — en-US grouping
   - `formatThaiDate(value: Date | string, style: 'long' | 'short' | 'monthYear'): string` — Buddhist year, local date parts; ISO `YYYY-MM-DD` parsed as a local date; invalid input → `INVALID_VALUE`
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 ```ts
 it.each([
@@ -188,10 +188,10 @@ it('thai dates', () => {
 
   Note: `0.01 → 'หนึ่งสตางค์'` — when baht is 0 and satang > 0, omit "ศูนย์บาท".
 
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement.** Use integer arithmetic on satang (`Math.round(x*100)` after parsing a decimal string, to avoid float error). Read millions groups right-to-left in 6-digit chunks; "เอ็ด" for a 1 in the units digit only when the chunk has a higher non-zero digit, or a higher chunk exists.
-- [ ] **Step 4: Run** → PASS
-- [ ] **Step 5: Commit** `feat(core): thai baht text, digits, numbers, dates`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement.** Use integer arithmetic on satang (`Math.round(x*100)` after parsing a decimal string, to avoid float error). Read millions groups right-to-left in 6-digit chunks; "เอ็ด" for a 1 in the units digit only when the chunk has a higher non-zero digit, or a higher chunk exists.
+- [x] **Step 4: Run** → PASS
+- [x] **Step 5: Commit** `feat(core): thai baht text, digits, numbers, dates`
 
 ### Task 4: Expressions, filters, binding
 
