@@ -209,7 +209,7 @@ it('thai dates', () => {
     - `ResolvedBlock = ResolvedParagraph | ResolvedImage | ResolvedTable | ResolvedColumns | ResolvedSignature | SpacerBlock | LineBlock | PageBreakBlock` (no `each`/`if`)
     - `ResolvedPageNumber = Required<DocumentDef['pageNumber']>` with defaults from Global Constraints filled in
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `binds dot paths and filters`: `'{{a.b | number:2}} {{amt | baht}}'` with `{a:{b:1250.5},amt:1}` → `'1,250.50 หนึ่งบาทถ้วน'`
   - `strict missing var throws`: `'{{nope}}'` → `MISSING_VARIABLE`, `path==='blocks[0].text'`; non-strict → `''` plus a warning with the same code
   - `expressions`: `evaluate(parseExpression("type == 'sick' && days >= 2"), {type:'sick',days:3}) === true`; `"!(a < 1) || b"`; string literals with escaped quotes
@@ -220,10 +220,10 @@ it('thai dates', () => {
   - `numerals thai skips email and url` (Review Focus 2): text `'ติดต่อ saraban01@moph.go.th หรือ https://a.go.th/x1 โทร 02-123-4567'` → `'ติดต่อ saraban01@moph.go.th หรือ https://a.go.th/x1 โทร ๐๒-๑๒๓-๔๕๖๗'`; run `numerals:'arabic'` is untouched
   - `bound values are literal` (Review Focus 5): data `{v:'{{secret}} <b>x</b>'}`, text `'{{v}}'` → `'{{secret}} <b>x</b>'` and no MISSING_VARIABLE
   - `limits`: `each` producing > 10,000 iterations total → `LIMIT_EXCEEDED`; `JSON.stringify(data).length > 5*1024*1024` → `LIMIT_EXCEEDED`
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement.** Single-pass scanner over `{{ … }}`: the output of a substitution is appended and never rescanned. Expression grammar: `or → and ('||' and)*`, `and → unary ('&&' unary)*`, `unary → '!' unary | cmp`, `cmp → primary (op primary)?`, `primary → number | string | true | false | null | path | '(' or ')'`. `each` exposes `as`, `$index`, and the parent scope. Detect email/URL tokens for numerals with `/\S+@\S+\.\S+|https?:\/\/\S+/g`.
-- [ ] **Step 4: Run** → PASS
-- [ ] **Step 5: Commit** `feat(core): safe expressions, filters, document binding`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement.** Single-pass scanner over `{{ … }}`: the output of a substitution is appended and never rescanned. Expression grammar: `or → and ('||' and)*`, `and → unary ('&&' unary)*`, `unary → '!' unary | cmp`, `cmp → primary (op primary)?`, `primary → number | string | true | false | null | path | '(' or ')'`. `each` exposes `as`, `$index`, and the parent scope. Detect email/URL tokens for numerals with `/\S+@\S+\.\S+|https?:\/\/\S+/g`.
+- [x] **Step 4: Run** → PASS
+- [x] **Step 5: Commit** `feat(core): safe expressions, filters, document binding`
 
 ### Task 5: Fonts package and providers
 
