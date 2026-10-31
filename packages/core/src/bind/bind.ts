@@ -344,9 +344,28 @@ export function bindDocument(
             sig.image = bindStr(b.image, scope, `${path}.image`, 'arabic')
           }
           if (b.positions !== undefined) {
-            sig.positions = b.positions.map((pos, pIdx) =>
-              bindStr(pos, scope, `${path}.positions[${pIdx}]`),
-            )
+            const boundPositions: string[] = []
+            for (let pIdx = 0; pIdx < b.positions.length; pIdx++) {
+              const pos = b.positions[pIdx]!
+              const trimmed = pos.trim()
+              const singleVarMatch = /^\{\{\s*([a-zA-Z0-9_.$]+)\s*\}\}$/.exec(trimmed)
+              if (singleVarMatch) {
+                const segs = singleVarMatch[1]!.split('.')
+                validatePathSegments(segs, `${path}.positions[${pIdx}]`)
+                const looked = lookupPath(scope, segs)
+                if (looked.found && Array.isArray(looked.value)) {
+                  for (const item of looked.value) {
+                    const str = String(item ?? '')
+                    boundPositions.push(
+                      docThaiNumerals ? convertThaiNumeralsSelective(str) : str,
+                    )
+                  }
+                  continue
+                }
+              }
+              boundPositions.push(bindStr(pos, scope, `${path}.positions[${pIdx}]`))
+            }
+            sig.positions = boundPositions
           }
           out.push(sig)
           break

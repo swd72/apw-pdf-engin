@@ -583,8 +583,8 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `memo: TemplateDef & { build(input: MemoInput) }`, where `interface MemoInput { agency: string; docNo: string; date: Date | string; subject: string; to: string; body: string[]; signer: { name: string; positions: string[]; signatureUrl?: string }; speed?: string; secrecy?: string }`
   - test helper `layoutOf(template, data): Promise<LayoutTree>`, plus `findRun(tree, textStartsWith): { page, item }`
 
-- [ ] **Step 1: Placeholder asset.** `make-placeholder.mjs` uses pngjs to write a 300×330 px grey eagle-shaped silhouette PNG labelled "PLACEHOLDER". Commit the generated PNG. The README states that it is not for real documents.
-- [ ] **Step 2: Failing conformance tests** (spec §3 / §14), using `memo.example`:
+- [x] **Step 1: Placeholder asset.** `make-placeholder.mjs` uses pngjs to write a 300×330 px grey eagle-shaped silhouette PNG labelled "PLACEHOLDER". Commit the generated PNG. The README states that it is not for real documents.
+- [x] **Step 2: Failing conformance tests** (spec §3 / §14), using `memo.example`:
   - garuda image: x = 85.0394, y = 42.5197, h = 42.5197
   - title run 'บันทึกข้อความ': bold, size 29, line box exactly 35, horizontally centered in the content area (run center = 311.811 ± 0.05)
   - labels 'ส่วนราชการ', 'ที่', 'วันที่', 'เรื่อง' are bold 20pt; their dotted leaders end at contentRight 538.58
@@ -593,10 +593,10 @@ it('unknown family → FONT_NOT_FOUND', …)
   - first body line x = 85.04 + 70.87; body lines are distributed (the right edge of non-last lines = 538.58 ± 0.01)
   - signature '(' x = 311.81
   - a long-body example (40 paragraphs) → page 2 has '- ๒ -' and page 1 has none
-- [ ] **Step 3: Run** `pnpm -F @apw-pdf/templates exec vitest run memo` → FAIL
-- [ ] **Step 4: Implement** `memo.document` per spec §9.1, with `{{}}` bindings, `dataSchema` (JSON Schema draft-07), `example` (realistic Thai purchase-request memo), and a `build()` that maps `MemoInput` to `{ doc: memo.document, data }`.
-- [ ] **Step 5: Run** → PASS
-- [ ] **Step 6: Commit** `feat(templates): บันทึกข้อความ template with conformance tests`
+- [x] **Step 3: Run** `pnpm -F @apw-pdf/templates exec vitest run memo` → FAIL
+- [x] **Step 4: Implement** `memo.document` per spec §9.1, with `{{}}` bindings, `dataSchema` (JSON Schema draft-07), `example` (realistic Thai purchase-request memo), and a `build()` that maps `MemoInput` to `{ doc: memo.document, data }`.
+- [x] **Step 5: Run** → PASS
+- [x] **Step 6: Commit** `feat(templates): บันทึกข้อความ template with conformance tests`
 
 ### Task 17: หนังสือภายนอก (external letter)
 
