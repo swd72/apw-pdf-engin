@@ -742,7 +742,7 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `save_template` writes `${templateDir}/${name}.json` only when `name` matches `^[a-z0-9-]{1,64}$` and `parseDocument` succeeds; `list_templates` merges builtin and saved templates
   - bin: reads `APW_PDF_OUTPUT_DIR` (required; exits 1 with a message if missing), `APW_PDF_TEMPLATE_DIR`, `APW_PDF_ALLOW_REMOTE_IMAGES` (comma-separated), then connects a `StdioServerTransport`
 
-- [ ] **Step 1: Failing tests** — use `InMemoryTransport.createLinkedPair()` with an SDK `Client`:
+- [x] **Step 1: Failing tests** — use `InMemoryTransport.createLinkedPair()` with an SDK `Client`:
   - `listTools` returns exactly `describe_schema, list_templates, get_template, validate_document, render_pdf, render_page_png, save_template`
   - `render_pdf {templateName:'memo', data: memo.example}` → a file exists inside outputDir, `pageCount: 1`
   - `render_pdf` with `fileName:'../x.pdf'` → `isError` and `PATH_NOT_ALLOWED`; no file is written outside
@@ -750,10 +750,10 @@ it('unknown family → FONT_NOT_FOUND', …)
   - `validate_document` with missing data → `ok:false` and issues with paths
   - `save_template {name:'my-memo', template: memo.document}`, then `list_templates` includes `{name:'my-memo', source:'saved'}`; `name:'../evil'` → error
   - `readResource('apw-pdf://standards')` contains 'ขอแสดงความนับถือ' and '2.5'
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement** with `McpServer` from `@modelcontextprotocol/sdk/server/mcp.js`, `registerTool(name, { description, inputSchema }, handler)` (zod raw shapes), `registerResource`, and `StdioServerTransport` from `server/stdio.js`. Check the installed SDK's README for the exact `registerTool`/`registerResource` signatures before coding.
-- [ ] **Step 4: Run** `pnpm -F @apw-pdf/mcp exec vitest run --coverage` → PASS
-- [ ] **Step 5: Commit** `feat(mcp): MCP server with schema guide, render, png preview, saved templates`
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement** with `McpServer` from `@modelcontextprotocol/sdk/server/mcp.js`, `registerTool(name, { description, inputSchema }, handler)` (zod raw shapes), `registerResource`, and `StdioServerTransport` from `server/stdio.js`. Check the installed SDK's README for the exact `registerTool`/`registerResource` signatures before coding.
+- [x] **Step 4: Run** `pnpm -F @apw-pdf/mcp exec vitest run --coverage` → PASS
+- [x] **Step 5: Commit** `feat(mcp): MCP server with schema guide, render, png preview, saved templates`
 
 ## Phase G — Examples and docs
 
