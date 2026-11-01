@@ -97,4 +97,62 @@ describe('fsFontProvider and fsImageProvider', () => {
     const dataImg = await provider.load(`data:image/png;base64,${b64}`)
     expect(Buffer.from(dataImg).equals(Buffer.from(PNG_1X1))).toBe(true)
   })
+
+  it('blocks SSRF via 3xx redirect to unallowed host and enforces https for non-loopback hosts (S1)', async () => {
+    let targetHit = false
+    const evilServer = http.createServer((_req, res) => {
+      targetHit = true
+      res.writeHead(200, { 'Content-Type': 'image/png' })
+      res.end(Buffer.from(PNG_1X1))
+    })
+    await new Promise<void>((resolve) => evilServer.listen(0, '127.0.0.1', () => resolve()))
+    const evilAddr = evilServer.address()
+    const evilPort = typeof evilAddr === 'object' && evilAddr ? evilAddr.port : 0
+
+    const redirectServer = http.createServer((req, res) => {
+      if (req.url === '/redirect-evil') {
+        res.writeHead(302, { Location: `http://localhost:${evilPort}/steal.png` })
+        res.end()
+        return
+      }
+      if (req.url === '/redirect-ok') {
+        res.writeHead(302, { Location: '/final.png' })
+        res.end()
+        return
+      }
+      res.writeHead(200, { 'Content-Type': 'image/png' })
+      res.end(Buffer.from(PNG_1X1))
+    })
+    await new Promise<void>((resolve) => redirectServer.listen(0, '127.0.0.1', () => resolve()))
+    const redirAddr = redirectServer.address()
+    const redirPort = typeof redirAddr === 'object' && redirAddr ? redirAddr.port : 0
+
+    try {
+      // Only 127.0.0.1 is allowlisted, NOT localhost
+      const provider = fsImageProvider({
+        allowRemoteImages: ['127.0.0.1', 'example.com'],
+      })
+
+      await expect(
+        provider.load(`http://127.0.0.1:${redirPort}/redirect-evil`),
+      ).rejects.toMatchObject({
+        code: 'IMAGE_NOT_ALLOWED',
+      })
+      expect(targetHit).toBe(false)
+
+      // Redirect to allowed host succeeds
+      const okBytes = await provider.load(`http://127.0.0.1:${redirPort}/redirect-ok`)
+      expect(Buffer.from(okBytes).equals(Buffer.from(PNG_1X1))).toBe(true)
+
+      // Non-loopback http:// is rejected even if hostname is in allowRemoteImages
+      await expect(
+        provider.load('http://example.com/logo.png'),
+      ).rejects.toMatchObject({
+        code: 'IMAGE_NOT_ALLOWED',
+      })
+    } finally {
+      await new Promise<void>((resolve) => redirectServer.close(() => resolve()))
+      await new Promise<void>((resolve) => evilServer.close(() => resolve()))
+    }
+  })
 })

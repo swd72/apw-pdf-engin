@@ -37,7 +37,36 @@ export function fsFontProvider(dirs: string[]): FontProvider {
 export interface FsImageProviderOptions {
   baseDir?: string
   allowRemoteImages?: string[]
+  allowInsecureHttp?: boolean
   assets?: Record<string, string | Uint8Array>
+}
+
+const MAX_REDIRECTS = 5
+
+function assertAllowedRemoteUrl(
+  parsed: URL,
+  allowlist: Set<string>,
+  allowInsecureHttp: boolean,
+): void {
+  const isLoopback =
+    parsed.hostname === '127.0.0.1' ||
+    parsed.hostname === 'localhost' ||
+    parsed.hostname === '[::1]'
+  const protocolOk =
+    parsed.protocol === 'https:' ||
+    (parsed.protocol === 'http:' && (allowInsecureHttp || isLoopback))
+  if (!protocolOk) {
+    throw new ApwPdfError(
+      'IMAGE_NOT_ALLOWED',
+      `Remote image protocol "${parsed.protocol}" is not allowed (HTTPS required)`,
+    )
+  }
+  if (!allowlist.has(parsed.hostname)) {
+    throw new ApwPdfError(
+      'IMAGE_NOT_ALLOWED',
+      `Remote image host "${parsed.hostname}" is not in allowRemoteImages`,
+    )
+  }
 }
 
 function decodeDataUrl(dataUrl: string): Uint8Array {
@@ -69,13 +98,14 @@ export function fsImageProvider(
 ): ImageProvider {
   const baseDir = path.resolve(opts.baseDir ?? process.cwd())
   const allowlist = new Set(opts.allowRemoteImages ?? [])
+  const allowInsecureHttp = opts.allowInsecureHttp ?? false
   const assets = opts.assets ?? {}
 
   return {
     async load(ref: string): Promise<Uint8Array> {
       if (ref.startsWith('asset:')) {
         const assetName = ref.slice('asset:'.length)
-        const custom = assets[assetName]
+        const custom = Object.hasOwn(assets, assetName) ? assets[assetName] : undefined
         if (custom instanceof Uint8Array) {
           if (custom.byteLength > MAX_IMAGE_BYTES) {
             throw new ApwPdfError('LIMIT_EXCEEDED', 'Asset image exceeds 10 MB limit')
@@ -104,34 +134,53 @@ export function fsImageProvider(
         return decodeDataUrl(ref)
       }
 
-      if (ref.startsWith('http://') || ref.startsWith('https://')) {
-        let parsed: URL
+      if (/^https?:\/\//i.test(ref)) {
+        let currentUrl: URL
         try {
-          parsed = new URL(ref)
+          currentUrl = new URL(ref)
         } catch {
           throw new ApwPdfError('IMAGE_LOAD_FAILED', `Invalid image URL "${ref}"`)
         }
-        if (!allowlist.has(parsed.hostname)) {
-          throw new ApwPdfError(
-            'IMAGE_NOT_ALLOWED',
-            `Remote image host "${parsed.hostname}" is not in allowRemoteImages`,
-          )
+
+        let res: Response | undefined
+        for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+          assertAllowedRemoteUrl(currentUrl, allowlist, allowInsecureHttp)
+          try {
+            res = await fetch(currentUrl, {
+              redirect: 'manual',
+              signal: AbortSignal.timeout(10_000),
+            })
+          } catch (err) {
+            throw new ApwPdfError(
+              'IMAGE_LOAD_FAILED',
+              `Failed to fetch remote image "${ref}": ${err instanceof Error ? err.message : String(err)}`,
+            )
+          }
+
+          if (res.status >= 300 && res.status < 400) {
+            await res.body?.cancel().catch(() => {})
+            const location = res.headers.get('location')
+            if (!location || hop === MAX_REDIRECTS) {
+              throw new ApwPdfError(
+                'IMAGE_LOAD_FAILED',
+                `Redirect failed or exceeded limit when fetching image "${ref}"`,
+              )
+            }
+            try {
+              currentUrl = new URL(location, currentUrl)
+            } catch {
+              throw new ApwPdfError('IMAGE_LOAD_FAILED', `Invalid redirect URL from "${ref}"`)
+            }
+            continue
+          }
+          break
         }
-        let res: Response
-        try {
-          res = await fetch(parsed, {
-            signal: AbortSignal.timeout(10_000),
-          })
-        } catch (err) {
+
+        if (!res || !res.ok) {
+          await res?.body?.cancel().catch(() => {})
           throw new ApwPdfError(
             'IMAGE_LOAD_FAILED',
-            `Failed to fetch remote image "${ref}": ${err instanceof Error ? err.message : String(err)}`,
-          )
-        }
-        if (!res.ok) {
-          throw new ApwPdfError(
-            'IMAGE_LOAD_FAILED',
-            `HTTP ${res.status} when fetching image "${ref}"`,
+            `HTTP ${res?.status ?? 0} when fetching image "${ref}"`,
           )
         }
         const ab = await res.arrayBuffer()
