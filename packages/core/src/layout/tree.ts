@@ -60,4 +60,5 @@ export interface LayoutTree {
   pages: LayoutPage[]
   fonts: FontRef[]
   warnings: Warning[]
+  imageCache?: Map<string, Uint8Array>
 }

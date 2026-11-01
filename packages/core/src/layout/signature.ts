@@ -70,12 +70,12 @@ export async function layoutSignature(
     }
   }
 
-  let imgDims: { w: number; h: number } | undefined
+  let imgDims: { resolvedSrc: string; w: number; h: number } | undefined
   if (hasImage && s.image) {
     const info = await loadImageWithCache(s.image, ctx, path)
     const imgH = s.imageHeight !== undefined ? toPt(s.imageHeight) : singleH * 1.5
     const imgW = imgH * (info.width / info.height)
-    imgDims = { w: imgW, h: imgH }
+    imgDims = { resolvedSrc: info.resolvedSrc, w: imgW, h: imgH }
   }
 
   const positions = s.positions ?? []
@@ -136,7 +136,7 @@ export async function layoutSignature(
           const imgY = currY + singleH - imgDims.h
           out.push({
             kind: 'image',
-            ref: s.image,
+            ref: imgDims.resolvedSrc,
             x: imgX,
             y: imgY,
             w: imgDims.w,

@@ -235,4 +235,66 @@ describe('writePdf and createPdfEngine', () => {
       }),
     )
   })
+
+  it('resolves non-identity doc.assets aliases and loads each image only once across layout and writePdf (C2)', async () => {
+    const loadCalls: string[] = []
+    const wasmPath = require.resolve('harfbuzzjs/dist/harfbuzz-subset.wasm')
+    const engine = await createPdfEngine({
+      fonts: createTestFontProvider(),
+      images: {
+        async load(ref: string): Promise<Uint8Array> {
+          loadCalls.push(ref)
+          if (ref === 'real-logo.png') return PNG_1X1
+          if (ref === 'real-sig.jpg') return JPG_1X1
+          throw new Error(`Unexpected image ref: ${ref}`)
+        },
+      },
+      subsetWasm: async () => {
+        const buf = await fs.readFile(wasmPath)
+        return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength)
+      },
+    })
+
+    const doc = {
+      ...BASE_DOC,
+      assets: {
+        logo: 'real-logo.png',
+        sig: 'real-sig.jpg',
+      },
+      blocks: [
+        {
+          type: 'image' as const,
+          src: 'logo',
+          width: '1.5cm',
+          height: '1.5cm',
+        },
+        {
+          type: 'image' as const,
+          src: 'asset:logo',
+          width: '1cm',
+          height: '1cm',
+          anchor: { relativeTo: 'margin' as const, x: 0, y: 0 },
+        },
+        {
+          type: 'signature' as const,
+          name: 'นายสมชาย ใจดี',
+          image: 'sig',
+        },
+      ],
+    }
+
+    const tree = await engine.layout(doc, {})
+    const imgItems = tree.pages[0]!.items.filter((i) => i.kind === 'image')
+    expect(imgItems.map((i) => (i.kind === 'image' ? i.ref : ''))).toEqual([
+      'real-logo.png',
+      'real-logo.png',
+      'real-sig.jpg',
+    ])
+
+    loadCalls.length = 0
+    const { bytes, pageCount } = await engine.renderPdf(doc, {})
+    expect(pageCount).toBe(1)
+    expect(bytes.byteLength).toBeGreaterThan(100)
+    expect(loadCalls).toEqual(['real-logo.png', 'real-sig.jpg'])
+  })
 })

@@ -195,14 +195,20 @@ export async function loadImageWithCache(
   src: string,
   ctx: FlowContext,
   path: string,
-): Promise<{ bytes: Uint8Array; width: number; height: number; format: 'png' | 'jpeg' }> {
+): Promise<{
+  resolvedSrc: string
+  bytes: Uint8Array
+  width: number
+  height: number
+  format: 'png' | 'jpeg'
+}> {
   let resolvedSrc = src
   if (src.startsWith('asset:')) {
     const assetName = src.slice('asset:'.length)
-    if (ctx.doc.assets?.[assetName]) {
+    if (ctx.doc.assets && Object.hasOwn(ctx.doc.assets, assetName)) {
       resolvedSrc = ctx.doc.assets[assetName]!
     }
-  } else if (ctx.doc.assets?.[src]) {
+  } else if (ctx.doc.assets && Object.hasOwn(ctx.doc.assets, src)) {
     resolvedSrc = ctx.doc.assets[src]!
   }
 
@@ -218,7 +224,7 @@ export async function loadImageWithCache(
     }
   }
   const info = readImageInfo(bytes)
-  return { bytes, ...info }
+  return { resolvedSrc, bytes, ...info }
 }
 
 export async function layoutBlockToFragment(
@@ -321,7 +327,7 @@ export async function layoutBlockToFragment(
         return {
           anchoredItem: {
             kind: 'image',
-            ref: block.src,
+            ref: info.resolvedSrc,
             x: imgX,
             y: imgY,
             w,
@@ -349,7 +355,7 @@ export async function layoutBlockToFragment(
           items: (yTop: number) => [
             {
               kind: 'image',
-              ref: block.src,
+              ref: info.resolvedSrc,
               x: imgX,
               y: yTop,
               w,

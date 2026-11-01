@@ -237,21 +237,23 @@ export async function writePdf(
   for (const page of tree.pages) {
     for (const item of page.items) {
       if (item.kind === 'image' && !embeddedImages.has(item.ref)) {
-        if (!opts.images) {
-          throw new ApwPdfError(
-            'IMAGE_LOAD_FAILED',
-            `No image provider configured to load "${item.ref}"`,
-          )
-        }
-        let imgBytes: Uint8Array
-        try {
-          imgBytes = await opts.images.load(item.ref)
-        } catch (err) {
-          if (err instanceof ApwPdfError) throw err
-          throw new ApwPdfError(
-            'IMAGE_LOAD_FAILED',
-            `Failed to load image "${item.ref}": ${err instanceof Error ? err.message : String(err)}`,
-          )
+        let imgBytes = tree.imageCache?.get(item.ref)
+        if (!imgBytes) {
+          if (!opts.images) {
+            throw new ApwPdfError(
+              'IMAGE_LOAD_FAILED',
+              `No image provider configured to load "${item.ref}"`,
+            )
+          }
+          try {
+            imgBytes = await opts.images.load(item.ref)
+          } catch (err) {
+            if (err instanceof ApwPdfError) throw err
+            throw new ApwPdfError(
+              'IMAGE_LOAD_FAILED',
+              `Failed to load image "${item.ref}": ${err instanceof Error ? err.message : String(err)}`,
+            )
+          }
         }
         const info = readImageInfo(imgBytes)
         const embedded =

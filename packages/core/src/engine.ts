@@ -116,11 +116,17 @@ export async function createEngine(opts: {
         italic: f.italic,
       }))
 
-      return {
+      const tree: LayoutTree = {
         pages,
         fonts: fontRefs,
         warnings: allWarnings,
       }
+      Object.defineProperty(tree, 'imageCache', {
+        value: flowCtx.imageCache,
+        enumerable: false,
+        configurable: true,
+      })
+      return tree
     },
   }
 }
