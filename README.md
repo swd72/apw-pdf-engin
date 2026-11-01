@@ -129,22 +129,23 @@ export function MemoScreen() {
 - กระดาษ A4 = `595.28 × 841.89 pt`
 
 ### ชนิดของบล็อก (Blocks)
-- `paragraph`: ย่อหน้าข้อความ (`text` หรือ `runs`), รองรับ `style.align` (`left`, `center`, `right`, `justify`, `thaiDistributed`), `firstLineIndent`, `leftIndent`, `rightIndent`, `spaceBefore`, `spaceAfter`, `lineSpacing`, `keepWithNext`, `keepTogether`, `tabs`
+- `paragraph`: ย่อหน้าข้อความ (`text` หรือ `runs`), รองรับ `align` (`left`, `center`, `right`, `justify`, `thaiDistributed`), `firstLineIndent`, `indentLeft`, `indentRight`, `spaceBefore`, `spaceAfter`, `lineSpacing`, `keepWithNext`, `keepLinesTogether`, `tabs` หรือ `style` (ชื่อสไตล์ที่กำหนดใน `styles`)
 - `image`: รูปภาพ (`src: "asset:garuda"` หรือ data URL / path ภายใต้ `baseDir`), กำหนด `width`/`height` และ `align`
 - `columns`: แบ่งคอลัมน์ซ้าย-ขวา เช่น ที่หนังสือและสถานที่ตั้งส่วนราชการในหนังสือภายนอก
 - `table`: ตารางข้อมูล รองรับ `columns` (% หรือความยาว), `header`, `repeatHeader: true` เมื่อตารางข้ามหน้า, เส้นขอบและ padding
-- `signature`: บล็อกลงนาม (`closing`, `name`, `positions`, `left`, `width`, `minLinesBefore: 3` ป้องกันลายเซ็นหลุดเดี่ยวไปหน้าถัดไป)
+- `signature`: บล็อกลงนาม (`name`, `positions`, `startAt`, `linesBefore`, `minLinesBefore: 3` ป้องกันลายเซ็นหลุดเดี่ยวไปหน้าถัดไป, `image`)
 - `spacer`, `line`, `pageBreak`, `each` (วนลูปอาร์เรย์), `if` (เงื่อนไขปลอดภัย ไม่ใช้ `eval`)
 
 ### ตัวกรองข้อมูล (Filters)
-- `{{date | thaiDate:'long'}}` → `31 ตุลาคม 2569` (`'full'` มีคำว่า `พ.ศ.`, `'short'` เดือนย่อ)
+- `{{date | thaiDate:'long'}}` → `31 ตุลาคม 2569` (`'short'` เดือนย่อ `31 ต.ค. 69`, `'monthYear'` เดือนและปี `ตุลาคม 2569`)
 - `{{amount | baht}}` → จำนวนเงินตัวอักษรไทย (`หนึ่งร้อยบาทถ้วน`)
 - `{{amount | number:2}}` → `1,234.50`
-- `{{text | thaiDigits}}` / `{{text | arabicDigits}}` → แปลงเลขไทย/อารบิก
+- `{{text | thaiNum}}` → แปลงตัวเลขอารบิกเป็นเลขไทย ๐-๙
 - `{{val | default:'-'}}` → ค่าเริ่มต้นเมื่อตัวแปรว่าง
+- `{{val | prefix:'ที่ '}}` → เติมคำนำหน้าเมื่อมีค่า
 
 ### จุดอ้างอิงแนวตั้งข้ามบรรทัด (Anchors `@name` & Tabs)
-ในบันทึกข้อความราชการ คำว่า **"วันที่"** ต้องมีตำแหน่งแนวนอน (`x`) ตรงกับตัวอักษร **"ข"** ของคำว่า **"ข้อความ"** ในหัวเรื่อง `"บันทึกข้อความ"` สามารถวาง `{ "anchor": "kho" }` หน้าคำว่า `"ข้อความ"` แล้วใช้ `{ "tab": true, "to": "@kho" }` ในบรรทัด `"ที่ ... วันที่ ..."` ได้โดยตรง:
+ในบันทึกข้อความราชการ คำว่า **"วันที่"** ต้องมีตำแหน่งแนวนอน (`x`) ตรงกับตัวอักษร **"ข"** ของคำว่า **"ข้อความ"** ในหัวเรื่อง `"บันทึกข้อความ"` สามารถกำหนด `anchors: [{ name: "kho", index: 6, edge: "start" }]` บนตัวอักษร "ข" ในข้อความ แล้วตั้งค่า `tabs: [{ at: "@kho", align: "left" }]` ร่วมกับ `{ "tab": true }` ในบรรทัด `"ที่ ... วันที่ ..."` ได้โดยตรง:
 
 ```json
 {
@@ -168,11 +169,15 @@ export function MemoScreen() {
           "blocks": [
             {
               "type": "paragraph",
-              "style": { "align": "center", "spaceBefore": "13.5pt" },
+              "align": "center",
+              "spaceBefore": "13.5pt",
               "runs": [
-                { "text": "บันทึก", "bold": true, "size": "29pt" },
-                { "anchor": "kho" },
-                { "text": "ข้อความ", "bold": true, "size": "29pt" }
+                {
+                  "text": "บันทึกข้อความ",
+                  "bold": true,
+                  "size": "29pt",
+                  "anchors": [{ "name": "kho", "index": 6, "edge": "start" }]
+                }
               ]
             }
           ]
@@ -184,19 +189,18 @@ export function MemoScreen() {
       "type": "paragraph",
       "runs": [
         { "text": "ส่วนราชการ ", "bold": true, "size": "20pt" },
-        { "text": "{{agency}}" },
-        { "fill": "dot", "width": "toEnd" }
+        { "fill": "{{agency}}", "width": "toEnd", "leader": "dots" }
       ]
     },
     {
       "type": "paragraph",
+      "tabs": [{ "at": "@kho", "align": "left" }],
       "runs": [
         { "text": "ที่ ", "bold": true, "size": "20pt" },
-        { "text": "{{docNo}}" },
-        { "tab": true, "to": "@kho", "leader": "dot" },
+        { "fill": "{{docNo}}", "width": "toTab", "leader": "dots" },
+        { "tab": true },
         { "text": "วันที่ ", "bold": true, "size": "20pt" },
-        { "text": "{{date | thaiDate:'long'}}" },
-        { "fill": "dot", "width": "toEnd" }
+        { "fill": "{{date | thaiDate:'long'}}", "width": "toEnd", "leader": "dots" }
       ]
     }
   ]
