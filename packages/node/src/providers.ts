@@ -35,7 +35,7 @@ export function fsFontProvider(dirs: string[]): FontProvider {
 }
 
 export interface FsImageProviderOptions {
-  baseDir?: string
+  baseDir?: string | null
   allowRemoteImages?: string[]
   allowInsecureHttp?: boolean
   assets?: Record<string, string | Uint8Array>
@@ -96,7 +96,7 @@ function resolveDefaultGarudaPath(): string {
 export function fsImageProvider(
   opts: FsImageProviderOptions = {},
 ): ImageProvider {
-  const baseDir = path.resolve(opts.baseDir ?? process.cwd())
+  const baseDir = opts.baseDir === null ? null : path.resolve(opts.baseDir ?? process.cwd())
   const allowlist = new Set(opts.allowRemoteImages ?? [])
   const allowInsecureHttp = opts.allowInsecureHttp ?? false
   const assets = opts.assets ?? {}
@@ -114,6 +114,18 @@ export function fsImageProvider(
         }
         if (typeof custom === 'string') {
           if (custom.startsWith('data:')) return decodeDataUrl(custom)
+          let stat: Awaited<ReturnType<typeof fs.stat>>
+          try {
+            stat = await fs.stat(custom)
+          } catch {
+            throw new ApwPdfError('IMAGE_LOAD_FAILED', `Failed to read asset "${assetName}"`)
+          }
+          if (!stat.isFile()) {
+            throw new ApwPdfError('IMAGE_NOT_ALLOWED', `Asset "${assetName}" is not a regular file`)
+          }
+          if (stat.size > MAX_IMAGE_BYTES) {
+            throw new ApwPdfError('LIMIT_EXCEEDED', 'Asset image exceeds 10 MB limit')
+          }
           const buf = await fs.readFile(custom)
           if (buf.byteLength > MAX_IMAGE_BYTES) {
             throw new ApwPdfError('LIMIT_EXCEEDED', 'Asset image exceeds 10 MB limit')
@@ -240,6 +252,13 @@ export function fsImageProvider(
         return out
       }
 
+      if (baseDir === null) {
+        throw new ApwPdfError(
+          'IMAGE_NOT_ALLOWED',
+          `Local file image "${ref}" is not allowed when imageBaseDir is disabled`,
+        )
+      }
+
       if (ref.includes('\0') || path.isAbsolute(ref)) {
         throw new ApwPdfError(
           'IMAGE_NOT_ALLOWED',
@@ -256,13 +275,56 @@ export function fsImageProvider(
         )
       }
 
-      let buf: Buffer
+      let stat: Awaited<ReturnType<typeof fs.stat>>
       try {
-        buf = await fs.readFile(resolved)
-      } catch (err) {
+        stat = await fs.stat(resolved)
+      } catch {
         throw new ApwPdfError(
           'IMAGE_LOAD_FAILED',
-          `Failed to read image file "${ref}": ${err instanceof Error ? err.message : String(err)}`,
+          `Failed to read image file "${ref}"`,
+        )
+      }
+      if (!stat.isFile()) {
+        throw new ApwPdfError(
+          'IMAGE_NOT_ALLOWED',
+          `Image path "${ref}" is not a regular file`,
+        )
+      }
+      if (stat.size > MAX_IMAGE_BYTES) {
+        throw new ApwPdfError(
+          'LIMIT_EXCEEDED',
+          `Image "${ref}" exceeds 10 MB limit`,
+        )
+      }
+
+      let realBase: string
+      let realTarget: string
+      try {
+        ;[realBase, realTarget] = await Promise.all([
+          fs.realpath(baseDir),
+          fs.realpath(resolved),
+        ])
+      } catch {
+        throw new ApwPdfError(
+          'IMAGE_LOAD_FAILED',
+          `Failed to resolve image file "${ref}"`,
+        )
+      }
+      const realRel = path.relative(realBase, realTarget)
+      if (realRel.startsWith('..') || path.isAbsolute(realRel)) {
+        throw new ApwPdfError(
+          'IMAGE_NOT_ALLOWED',
+          `Image path "${ref}" escapes imageBaseDir`,
+        )
+      }
+
+      let buf: Buffer
+      try {
+        buf = await fs.readFile(realTarget)
+      } catch {
+        throw new ApwPdfError(
+          'IMAGE_LOAD_FAILED',
+          `Failed to read image file "${ref}"`,
         )
       }
       if (buf.byteLength > MAX_IMAGE_BYTES) {

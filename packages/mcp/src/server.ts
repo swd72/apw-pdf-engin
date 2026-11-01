@@ -22,6 +22,7 @@ import {
 export interface ServerOptions {
   outputDir: string
   templateDir?: string
+  imageBaseDir?: string | null
   allowRemoteImages?: string[]
 }
 
@@ -67,6 +68,7 @@ async function readSavedTemplate(
 
 export async function createServer(opts: ServerOptions): Promise<McpServer> {
   const renderer = await createRenderer({
+    imageBaseDir: opts.imageBaseDir ?? null,
     allowRemoteImages: opts.allowRemoteImages,
   })
 
@@ -465,6 +467,7 @@ export async function runStdioServer(
     throw new Error('APW_PDF_OUTPUT_DIR environment variable is required')
   }
   const templateDir = env.APW_PDF_TEMPLATE_DIR?.trim() || undefined
+  const imageBaseDir = env.APW_PDF_IMAGE_BASE_DIR?.trim() || undefined
   const allowRemoteImages = env.APW_PDF_ALLOW_REMOTE_IMAGES
     ? env.APW_PDF_ALLOW_REMOTE_IMAGES.split(',')
         .map((s) => s.trim())
@@ -474,6 +477,7 @@ export async function runStdioServer(
   const server = await createServer({
     outputDir: path.resolve(outputDir),
     templateDir: templateDir ? path.resolve(templateDir) : undefined,
+    imageBaseDir: imageBaseDir ? path.resolve(imageBaseDir) : null,
     allowRemoteImages,
   })
   const transport = new StdioServerTransport()

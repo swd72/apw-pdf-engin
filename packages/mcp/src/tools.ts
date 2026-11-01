@@ -128,6 +128,12 @@ export function getSchemaGuide(
   }
 }
 
+function sanitizeErrorMessage(msg: string): string {
+  return msg
+    .replace(/[A-Za-z]:\\[^\s"']+/g, '<path>')
+    .replace(/\/(?:[\w.-]+\/)+[\w.-]+/g, '<path>')
+}
+
 export function formatToolError(err: unknown): {
   isError: true
   content: Array<{ type: 'text'; text: string }>
@@ -140,7 +146,7 @@ export function formatToolError(err: unknown): {
           type: 'text',
           text: JSON.stringify({
             code: err.code,
-            message: err.message,
+            message: sanitizeErrorMessage(err.message),
             path: err.path,
           }),
         },
@@ -155,7 +161,7 @@ export function formatToolError(err: unknown): {
           type: 'text',
           text: JSON.stringify({
             code: err.code,
-            message: err.message,
+            message: sanitizeErrorMessage(err.message),
             path: err.path,
           }),
         },
@@ -169,7 +175,7 @@ export function formatToolError(err: unknown): {
         type: 'text',
         text: JSON.stringify({
           code: 'INTERNAL_ERROR',
-          message: err instanceof Error ? err.message : String(err),
+          message: 'An internal error occurred',
         }),
       },
     ],

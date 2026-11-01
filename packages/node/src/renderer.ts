@@ -16,7 +16,7 @@ const require = createRequire(import.meta.url)
 
 export interface CreateRendererOptions {
   fontDirs?: string[]
-  imageBaseDir?: string
+  imageBaseDir?: string | null
   allowRemoteImages?: string[]
   assets?: Record<string, string | Uint8Array>
 }

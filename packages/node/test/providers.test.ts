@@ -216,4 +216,34 @@ describe('fsFontProvider and fsImageProvider', () => {
       await new Promise<void>((resolve) => server.close(() => resolve()))
     }
   })
+
+  it('blocks symlinks/junctions escaping baseDir, disables local files when baseDir is null, and omits host paths from errors (M8, M9)', async () => {
+    const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), 'apw-pdf-base-'))
+    const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), 'apw-pdf-outside-'))
+    const secretFile = path.join(outsideDir, 'secret.png')
+    await fs.writeFile(secretFile, PNG_1X1)
+
+    const junctionPath = path.join(baseDir, 'linked-out')
+    await fs.symlink(outsideDir, junctionPath, 'junction')
+
+    const provider = fsImageProvider({ baseDir })
+    await expect(provider.load('linked-out/secret.png')).rejects.toMatchObject({
+      code: 'IMAGE_NOT_ALLOWED',
+    })
+
+    // Missing file error does not leak host baseDir path
+    try {
+      await provider.load('nonexistent-file.png')
+      expect.unreachable('should have thrown')
+    } catch (err: any) {
+      expect(err.code).toBe('IMAGE_LOAD_FAILED')
+      expect(err.message).not.toContain(baseDir)
+    }
+
+    // baseDir: null disables local relative file loading completely
+    const disabledLocal = fsImageProvider({ baseDir: null })
+    await expect(disabledLocal.load('local.png')).rejects.toMatchObject({
+      code: 'IMAGE_NOT_ALLOWED',
+    })
+  })
 })

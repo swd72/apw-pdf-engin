@@ -252,4 +252,35 @@ describe('@apw-pdf/mcp server and tools', () => {
       'APW_PDF_OUTPUT_DIR environment variable is required',
     )
   })
+
+  it('disables relative local file images in MCP by default and sanitizes internal error messages (M8, M9)', async () => {
+    const docWithLocalImg = {
+      ...memo.document,
+      blocks: [
+        {
+          type: 'image',
+          src: 'package.json',
+          width: '2cm',
+        },
+      ],
+    }
+    const res = await client.callTool({
+      name: 'render_pdf',
+      arguments: {
+        template: docWithLocalImg,
+        data: {},
+      },
+    })
+    expect(res.isError).toBe(true)
+    const content = res.content as Array<{ type: string; text: string }>
+    expect(content[0]!.text).toContain('IMAGE_NOT_ALLOWED')
+
+    const fsErr = new Error(
+      "ENOENT: no such file or directory, open 'C:\\Users\\secret\\private.json'",
+    )
+    const formatted = formatToolError(fsErr)
+    expect(formatted.isError).toBe(true)
+    expect(formatted.content[0]!.text).not.toContain('C:\\Users\\secret')
+    expect(formatted.content[0]!.text).not.toContain('private.json')
+  })
 })
