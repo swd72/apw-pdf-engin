@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "tsup server.ts --format esm --clean",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "@apw-pdf/node": "workspace:*",

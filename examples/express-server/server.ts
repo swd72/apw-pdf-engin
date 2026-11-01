@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url'
 import express from 'express'
 import { ApwPdfError, createRenderer } from '@apw-pdf/node'
 import { templates } from '@apw-pdf/templates'
@@ -8,6 +9,27 @@ export interface ServerOptions {
   maxConcurrent?: number
   renderer?: {
     render(doc: string, data: unknown): Promise<Uint8Array>
+  }
+}
+
+export function pruneRateWindows(
+  windows: Map<string, { count: number; resetAt: number }>,
+  now: number,
+  maxEntries = 10_000,
+): void {
+  for (const [ip, entry] of windows) {
+    if (entry.resetAt <= now) {
+      windows.delete(ip)
+    }
+  }
+  if (windows.size > maxEntries) {
+    const toDrop = windows.size - maxEntries
+    let dropped = 0
+    for (const key of windows.keys()) {
+      windows.delete(key)
+      dropped++
+      if (dropped >= toDrop) break
+    }
   }
 }
 
@@ -33,6 +55,7 @@ export async function createApp(opts?: ServerOptions) {
 
   app.post('/pdf/:template', async (req, res) => {
     const now = Date.now()
+    pruneRateWindows(rateWindows, now)
     const clientIp = req.ip ?? '127.0.0.1'
     let bucket = rateWindows.get(clientIp)
     if (!bucket || now >= bucket.resetAt) {
@@ -117,7 +140,16 @@ export async function createApp(opts?: ServerOptions) {
   return app
 }
 
-if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, '/')}`) {
+export function isMainModule(metaUrl: string, argv1?: string): boolean {
+  if (!argv1) return false
+  try {
+    return metaUrl === pathToFileURL(argv1).href
+  } catch {
+    return false
+  }
+}
+
+if (isMainModule(import.meta.url, process.argv[1])) {
   const port = Number(process.env.PORT ?? 3456)
   const host = process.env.HOST ?? '127.0.0.1'
   createApp()
