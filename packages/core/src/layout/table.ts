@@ -366,6 +366,19 @@ function makeTableFragment(
       path,
       splittable: false,
       items: renderAll,
+      pullTail(_needed: number, canPullAll: boolean) {
+        if (!canPullAll || bodySec.rowHeights.length === 0) {
+          return null
+        }
+        return {
+          remain: null,
+          pulled: {
+            ...makeTableFragment(headerSec, bodySec, footerSec, repeatHeader, path),
+            keepWithNext: true,
+          },
+          count: bodySec.rowHeights.length,
+        }
+      },
     }
   }
 
@@ -379,6 +392,41 @@ function makeTableFragment(
     path,
     splittable: true,
     items: renderAll,
+    pullTail(needed: number, canPullAll: boolean) {
+      const nRows = bodySec.rowHeights.length
+      if (nRows <= needed && canPullAll) {
+        return {
+          remain: null,
+          pulled: {
+            ...makeTableFragment(headerSec, bodySec, footerSec, repeatHeader, path),
+            keepWithNext: true,
+          },
+          count: nRows,
+        }
+      }
+      const k = Math.max(1, nRows - needed)
+      if (k >= nRows) {
+        return null
+      }
+      const headBody = bodySec.sliceRows(0, k)
+      const tailBody = bodySec.sliceRows(k, nRows)
+      const headFrag = makeTableFragment(headerSec, headBody, null, repeatHeader, path)
+      const tailFrag = {
+        ...makeTableFragment(
+          repeatHeader ? headerSec : null,
+          tailBody,
+          footerSec,
+          repeatHeader,
+          path,
+        ),
+        keepWithNext: true,
+      }
+      return {
+        remain: headFrag,
+        pulled: tailFrag,
+        count: nRows - k,
+      }
+    },
     split(avail: number): [Fragment, Fragment] | null {
       let acc = headerH
       let k = 0

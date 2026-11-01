@@ -96,6 +96,163 @@ describe('signature, page numbers, and createEngine', () => {
     expect(p2Glyphs[3]!.text).toBe('(นายสมชาย ใจดี)')
   })
 
+  it('splits a 5-line paragraph for signature pull-back and pulls all 4 lines of a 4-line paragraph without leaving a 1-line orphan (M3)', async () => {
+    const engine = await createEngine({ fonts: testFontProvider() })
+
+    // Subcase A: 35 1-line paragraphs + 1 5-line paragraph = 40 lines on page 1.
+    // Signature (minLinesBefore: 3) splits the 5-line paragraph into 2 lines on page 1 and 3 lines on page 2.
+    const paras35 = Array.from({ length: 35 }, (_, i) => ({
+      type: 'paragraph' as const,
+      text: `บรรทัดที่ ${i + 1}`,
+    }))
+    const fiveLineRuns = Array.from({ length: 5 }, (_, i) => [
+      ...(i > 0 ? [{ lineBreak: true as const }] : []),
+      { text: `วรรคท้ายบรรทัดที่${i + 1}` },
+    ]).flat()
+    const tree5 = await engine.layout(
+      {
+        ...baseDocSpec,
+        blocks: [
+          ...paras35,
+          { type: 'paragraph', runs: fiveLineRuns },
+          {
+            type: 'signature',
+            linesBefore: 4,
+            minLinesBefore: 3,
+            name: 'นายสมชาย ใจดี',
+            positions: ['ผู้อำนวยการ'],
+          },
+        ],
+      },
+      {},
+    )
+    expect(tree5.pages.length).toBe(2)
+    const p1Glyphs5 = tree5.pages[0]!.items.filter((it) => it.kind === 'glyphs')
+    expect(p1Glyphs5.length).toBe(37) // 35 + 2 lines from the 5-line paragraph
+    const p2Glyphs5 = tree5.pages[1]!.items.filter(
+      (it) => it.kind === 'glyphs' && it.sourcePath.startsWith('blocks['),
+    )
+    expect(p2Glyphs5.map((g) => g.text)).toEqual([
+      'วรรคท้ายบรรทัดที่3',
+      'วรรคท้ายบรรทัดที่4',
+      'วรรคท้ายบรรทัดที่5',
+      '(นายสมชาย ใจดี)',
+      'ผู้อำนวยการ',
+    ])
+
+    // Subcase B: 36 1-line paragraphs + 1 4-line paragraph = 40 lines on page 1.
+    // Splitting 3 lines from a 4-line paragraph would leave a 1-line orphan on page 1,
+    // so all 4 lines of the paragraph must be pulled to page 2.
+    const paras36 = Array.from({ length: 36 }, (_, i) => ({
+      type: 'paragraph' as const,
+      text: `บรรทัดที่ ${i + 1}`,
+    }))
+    const fourLineRuns = Array.from({ length: 4 }, (_, i) => [
+      ...(i > 0 ? [{ lineBreak: true as const }] : []),
+      { text: `สี่บรรทัดที่${i + 1}` },
+    ]).flat()
+    const tree4 = await engine.layout(
+      {
+        ...baseDocSpec,
+        blocks: [
+          ...paras36,
+          { type: 'paragraph', runs: fourLineRuns },
+          {
+            type: 'signature',
+            linesBefore: 4,
+            minLinesBefore: 3,
+            name: 'นายสมชาย ใจดี',
+            positions: ['ผู้อำนวยการ'],
+          },
+        ],
+      },
+      {},
+    )
+    expect(tree4.pages.length).toBe(2)
+    const p1Glyphs4 = tree4.pages[0]!.items.filter((it) => it.kind === 'glyphs')
+    expect(p1Glyphs4.length).toBe(36) // No 1-line orphan left on page 1
+    const p2Glyphs4 = tree4.pages[1]!.items.filter(
+      (it) => it.kind === 'glyphs' && it.sourcePath.startsWith('blocks['),
+    )
+    expect(p2Glyphs4.map((g) => g.text)).toEqual([
+      'สี่บรรทัดที่1',
+      'สี่บรรทัดที่2',
+      'สี่บรรทัดที่3',
+      'สี่บรรทัดที่4',
+      '(นายสมชาย ใจดี)',
+      'ผู้อำนวยการ',
+    ])
+  })
+
+  it('pulls trailing table rows and does not loop infinitely when minLinesBefore exceeds page height (M3)', async () => {
+    const engine = await createEngine({ fonts: testFontProvider() })
+
+    // Subcase A: Preceding table before overflowing signature pulls last 2 body rows to page 2
+    const paras34 = Array.from({ length: 34 }, (_, i) => ({
+      type: 'paragraph' as const,
+      text: `บรรทัดที่ ${i + 1}`,
+    }))
+    const treeTable = await engine.layout(
+      {
+        ...baseDocSpec,
+        blocks: [
+          ...paras34,
+          {
+            type: 'table',
+            columns: [{ width: '100%' }],
+            rows: [
+              [{ text: 'แถวตาราง 1' }],
+              [{ text: 'แถวตาราง 2' }],
+              [{ text: 'แถวตาราง 3' }],
+              [{ text: 'แถวตาราง 4' }],
+            ],
+          },
+          {
+            type: 'signature',
+            linesBefore: 4,
+            minLinesBefore: 2,
+            name: 'นายสมชาย ใจดี',
+            positions: ['ผู้อำนวยการ'],
+          },
+        ],
+      },
+      {},
+    )
+    expect(treeTable.pages.length).toBe(2)
+    const p2TableTexts = treeTable.pages[1]!.items
+      .filter((it) => it.kind === 'glyphs' && it.sourcePath.startsWith('blocks['))
+      .map((it) => (it.kind === 'glyphs' ? it.text : ''))
+    expect(p2TableTexts).toEqual(['แถวตาราง 3', 'แถวตาราง 4', '(นายสมชาย ใจดี)', 'ผู้อำนวยการ'])
+
+    // Subcase B: minLinesBefore: 45 (exceeds full page height) does not loop into LIMIT_EXCEEDED
+    const paras40 = Array.from({ length: 40 }, (_, i) => ({
+      type: 'paragraph' as const,
+      text: `บรรทัดที่ ${i + 1}`,
+    }))
+    const treeHugeMin = await engine.layout(
+      {
+        ...baseDocSpec,
+        blocks: [
+          ...paras40,
+          {
+            type: 'signature',
+            linesBefore: 4,
+            minLinesBefore: 45,
+            name: 'นายสมชาย ใจดี',
+            positions: ['ผู้อำนวยการ'],
+          },
+        ],
+      },
+      {},
+    )
+    expect(treeHugeMin.pages.length).toBe(2)
+    const p2HugeTexts = treeHugeMin.pages[1]!.items
+      .filter((it) => it.kind === 'glyphs' && it.sourcePath.startsWith('blocks['))
+      .map((it) => (it.kind === 'glyphs' ? it.text : ''))
+    expect(p2HugeTexts.length).toBeGreaterThan(2)
+    expect(p2HugeTexts).toContain('(นายสมชาย ใจดี)')
+  })
+
   it('renders page numbers from page 2 with Thai numerals and pushes page-2 body down to 52.38pt', async () => {
     const engine = await createEngine({ fonts: testFontProvider() })
     const paras = Array.from({ length: 50 }, (_, i) => ({

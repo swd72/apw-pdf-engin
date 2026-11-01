@@ -207,6 +207,25 @@ describe('block flow and pagination', () => {
     expect(pagesKeepLines.length).toBe(2)
     expect(pagesKeepLines[0]!.items.filter((it) => it.kind === 'glyphs').length).toBe(0)
     expect(pagesKeepLines[1]!.items.filter((it) => it.kind === 'glyphs').length).toBe(4)
+
+    // keepWithNext chain A -> B -> C moves A, B, and C together when only A + B fit on page 1 (M4)
+    const ctxChain = makeFlowCtx({
+      ...baseDocSpec,
+      blocks: [
+        { type: 'spacer', height: '700pt' }, // leaves ~42.68pt: fits A + B (36.16pt) but not A + B + C (54.24pt)
+        { type: 'paragraph', text: 'หัวข้อใหญ่ A', keepWithNext: true },
+        { type: 'paragraph', text: 'หัวข้อย่อย B', keepWithNext: true },
+        { type: 'paragraph', text: 'เนื้อหา C' },
+      ],
+    })
+    const pagesChain = await paginate(ctxChain.doc.blocks, ctxChain)
+    expect(pagesChain.length).toBe(2)
+    expect(pagesChain[0]!.items.filter((it) => it.kind === 'glyphs').length).toBe(0)
+    expect(
+      pagesChain[1]!.items
+        .filter((it) => it.kind === 'glyphs')
+        .map((it) => (it.kind === 'glyphs' ? it.text : '')),
+    ).toEqual(['หัวข้อใหญ่ A', 'หัวข้อย่อย B', 'เนื้อหา C'])
   })
 
   it('places anchored and inline images without anchored image consuming flow', async () => {

@@ -30,6 +30,10 @@ export interface UnsplittableFragment {
   splittable: false
   items(yTop: number): LayoutItem[]
   paraLines?: LaidLine[]
+  pullTail?(
+    needed: number,
+    canPullAll: boolean,
+  ): { remain: Fragment | null; pulled: Fragment; count: number } | null
 }
 
 export interface SplittableFragment {
@@ -44,6 +48,10 @@ export interface SplittableFragment {
   items(yTop: number): LayoutItem[]
   split(avail: number): [Fragment, Fragment] | null
   paraLines?: LaidLine[]
+  pullTail?(
+    needed: number,
+    canPullAll: boolean,
+  ): { remain: Fragment | null; pulled: Fragment; count: number } | null
 }
 
 export type Fragment = UnsplittableFragment | SplittableFragment
@@ -403,7 +411,7 @@ interface PlacedPageEntry {
   effectiveSpaceBefore: number
 }
 
-function minRequiredWithNext(queue: Fragment[], idx: number): number {
+function minRequiredWithNext(queue: Fragment[], idx: number, fullPageAvail: number): number {
   const frag = queue[idx]!
   const selfMin = frag.splittable ? frag.minHeadHeight : frag.height
   if (!frag.keepWithNext || idx + 1 >= queue.length) {
@@ -411,7 +419,20 @@ function minRequiredWithNext(queue: Fragment[], idx: number): number {
   }
   const nextFrag = queue[idx + 1]!
   const nextMin = nextFrag.splittable ? nextFrag.minHeadHeight : nextFrag.height
-  return frag.height + frag.spaceAfter + nextFrag.spaceBefore + nextMin
+  const pairMin = frag.height + frag.spaceAfter + nextFrag.spaceBefore + nextMin
+
+  let chainHeight = frag.height
+  let curIdx = idx
+  while (queue[curIdx]!.keepWithNext && curIdx + 1 < queue.length) {
+    const cur = queue[curIdx]!
+    const nxt = queue[curIdx + 1]!
+    const isNextChainContinue = Boolean(nxt.keepWithNext && curIdx + 2 < queue.length)
+    const nxtReq = isNextChainContinue ? nxt.height : nxt.splittable ? nxt.minHeadHeight : nxt.height
+    chainHeight += cur.spaceAfter + nxt.spaceBefore + nxtReq
+    curIdx++
+  }
+
+  return chainHeight <= fullPageAvail + 1e-6 ? chainHeight : pairMin
 }
 
 export async function paginate(
@@ -424,6 +445,7 @@ export async function paginate(
   let pageIndex = 0
   let cursorY = ctx.bodyTop(0)
   let atAutoBreakTop = false
+  const pulledOnce = new WeakSet<Fragment>()
 
   function pageBottom(): number {
     return ctx.box.height - ctx.box.margin.bottom
@@ -453,32 +475,60 @@ export async function paginate(
     atAutoBreakTop = isAutoBreak
   }
 
-  function pullPrecedingLines(minLines: number): Fragment[] {
+  function pullPrecedingLines(minLines: number, sigFrag: Fragment): Fragment[] {
     const pulledFrags: Fragment[] = []
     let needed = minLines
+    const nextPageAvail = pageBottom() - ctx.bodyTop(pageIndex + 1)
+    const remainingPullHeight = Math.max(0, nextPageAvail - sigFrag.spaceBefore - sigFrag.height)
+    let pulledHeight = 0
 
     while (needed > 0 && pageEntries.length > 0) {
       const lastEntry = pageEntries[pageEntries.length - 1]!
+      const canPullAll = pageEntries.length > 1
       const pLines = lastEntry.frag.paraLines
-      if (!pLines || pLines.length === 0) {
-        break
-      }
-      if (pLines.length <= needed) {
-        pageEntries.pop()
-        pulledFrags.unshift(
-          createParagraphFragment({
-            lines: pLines,
-            spaceBefore: lastEntry.frag.spaceBefore,
-            spaceAfter: lastEntry.frag.spaceAfter,
-            keepWithNext: true,
-            keepLinesTogether: true,
-            widowControl: false,
-            path: lastEntry.frag.path,
-          }),
-        )
-        needed -= pLines.length
-      } else {
-        const splitIdx = pLines.length - needed
+      if (pLines && pLines.length > 0) {
+        const shouldPullWhole = pLines.length <= needed || pLines.length - needed < 2
+        if (shouldPullWhole && canPullAll) {
+          const fragH = pLines.reduce((s, l) => s + l.height, 0) + lastEntry.frag.spaceAfter
+          if (pulledHeight + fragH <= remainingPullHeight + 1e-6) {
+            pageEntries.pop()
+            pulledFrags.unshift(
+              createParagraphFragment({
+                lines: pLines,
+                spaceBefore: lastEntry.frag.spaceBefore,
+                spaceAfter: lastEntry.frag.spaceAfter,
+                keepWithNext: true,
+                keepLinesTogether: true,
+                widowControl: false,
+                path: lastEntry.frag.path,
+              }),
+            )
+            pulledHeight += fragH
+            needed -= pLines.length
+            continue
+          }
+        }
+
+        const minRemain = canPullAll ? 2 : 1
+        if (pLines.length <= minRemain) {
+          break
+        }
+        let maxLinesByHeight = 0
+        let accH = lastEntry.frag.spaceAfter
+        for (let i = pLines.length - 1; i >= minRemain; i--) {
+          const lh = pLines[i]!.height
+          if (pulledHeight + accH + lh <= remainingPullHeight + 1e-6) {
+            accH += lh
+            maxLinesByHeight++
+          } else {
+            break
+          }
+        }
+        const pullCount = Math.min(needed, pLines.length - minRemain, maxLinesByHeight)
+        if (pullCount <= 0) {
+          break
+        }
+        const splitIdx = pLines.length - pullCount
         const remainLines = pLines.slice(0, splitIdx)
         const moveLines = pLines.slice(splitIdx)
         lastEntry.frag = createParagraphFragment({
@@ -501,8 +551,47 @@ export async function paginate(
             path: lastEntry.frag.path,
           }),
         )
-        needed = 0
+        pulledHeight += accH
+        needed -= pullCount
+        break
       }
+
+      if (lastEntry.frag.pullTail) {
+        const res = lastEntry.frag.pullTail(needed, canPullAll)
+        if (
+          !res ||
+          pulledHeight + res.pulled.height + res.pulled.spaceAfter > remainingPullHeight + 1e-6
+        ) {
+          break
+        }
+        if (res.remain) {
+          lastEntry.frag = res.remain
+        } else {
+          pageEntries.pop()
+        }
+        pulledFrags.unshift(res.pulled)
+        pulledHeight += res.pulled.height + res.pulled.spaceAfter
+        needed -= res.count
+        if (res.remain) {
+          break
+        }
+        continue
+      }
+
+      if (canPullAll) {
+        const fragH = lastEntry.frag.height + lastEntry.frag.spaceAfter
+        if (pulledHeight + fragH <= remainingPullHeight + 1e-6) {
+          pageEntries.pop()
+          pulledFrags.unshift({
+            ...lastEntry.frag,
+            keepWithNext: true,
+          })
+          pulledHeight += fragH
+          needed -= 1
+          continue
+        }
+      }
+      break
     }
 
     return pulledFrags
@@ -573,7 +662,7 @@ export async function paginate(
         )
       }
 
-      const requiredForKeep = minRequiredWithNext(fragQueue, qIdx)
+      const requiredForKeep = minRequiredWithNext(fragQueue, qIdx, fullPageAvail)
       if (!isPageEmpty && frag.keepWithNext && requiredForKeep > avail + 1e-6) {
         startNewPage(true)
         continue
@@ -606,8 +695,9 @@ export async function paginate(
 
       // Unsplittable and does not fit on current page
       if (!isPageEmpty) {
-        if (frag.minLinesBefore && frag.minLinesBefore > 0) {
-          const pulled = pullPrecedingLines(frag.minLinesBefore)
+        if (frag.minLinesBefore && frag.minLinesBefore > 0 && !pulledOnce.has(frag)) {
+          pulledOnce.add(frag)
+          const pulled = pullPrecedingLines(frag.minLinesBefore, frag)
           startNewPage(true)
           if (pulled.length > 0) {
             fragQueue.splice(qIdx, 0, ...pulled)
