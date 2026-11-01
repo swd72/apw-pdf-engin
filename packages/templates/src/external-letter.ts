@@ -17,6 +17,7 @@ export interface ExternalLetterInput {
   reference?: string
   enclosures?: string[]
   body: string[]
+  /** Space before each body paragraph (default 0). Applied by build() / instantiateTemplate(), not by `document` alone. */
   paragraphSpacing?: Length
   closing?: string
   signer: {

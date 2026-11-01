@@ -32,6 +32,21 @@ export type BuiltTemplate<T> = TemplateDef & {
   build(input: T): { doc: DocumentDef; data: unknown }
 }
 
+/**
+ * Resolves a template + data into the document to render. Templates with
+ * input-dependent options (e.g. external-letter paragraphSpacing) only honour
+ * them through build(); callers that render by template name must use this.
+ */
+export function instantiateTemplate(
+  tpl: TemplateDef,
+  data: unknown,
+): { doc: DocumentDef; data: unknown } {
+  if (tpl.build && typeof data === 'object' && data !== null && !Array.isArray(data)) {
+    return tpl.build(data)
+  }
+  return { doc: tpl.document, data }
+}
+
 export function defineTemplate<T>(def: BuiltTemplate<T>): BuiltTemplate<T> {
   return {
     ...def,

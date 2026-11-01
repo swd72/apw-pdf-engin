@@ -617,6 +617,8 @@ export interface TemplateDef {
   document: DocumentDef
   dataSchema: object
   example: unknown
+  /** Optional input-dependent variant of `document` (e.g. template options). */
+  build?(input: unknown): { doc: DocumentDef; data: unknown }
 }
 
 export function formatZodPath(path: (string | number)[]): string {

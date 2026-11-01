@@ -2,7 +2,7 @@ import { describe, it, expect, test } from 'vitest'
 import os from 'node:os'
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import { memo } from '@apw-pdf/templates'
+import { externalLetter, memo } from '@apw-pdf/templates'
 import { createRenderer } from '../src/index.js'
 import { createApp } from '../../../examples/express-server/server.js'
 
@@ -124,5 +124,20 @@ describe('createRenderer', () => {
     } finally {
       server.close()
     }
+  })
+  it('applies external-letter paragraphSpacing when rendering by template name (N1)', async () => {
+    const renderer = await createRenderer()
+    const creationDate = new Date('2026-11-01T00:00:00Z')
+    const example = externalLetter.example as Record<string, unknown>
+    const base = await renderer.render('external-letter', example, { creationDate })
+    const again = await renderer.render('external-letter', example, { creationDate })
+    expect(Buffer.from(again).equals(Buffer.from(base))).toBe(true)
+
+    const spaced = await renderer.render(
+      'external-letter',
+      { ...example, paragraphSpacing: '12pt' },
+      { creationDate },
+    )
+    expect(Buffer.from(spaced).equals(Buffer.from(base))).toBe(false)
   })
 })

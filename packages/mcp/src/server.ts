@@ -97,7 +97,8 @@ export async function createServer(opts: ServerOptions): Promise<McpServer> {
         ]
       : undefined
     if (builtin) {
-      return builtin.document
+      // Resolved by name in the renderer so template build() options apply.
+      return templateName
     }
     if (opts.templateDir) {
       const saved = await readSavedTemplate(opts.templateDir, templateName)

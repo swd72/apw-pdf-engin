@@ -13,8 +13,9 @@ const defaultIO: CliIO = {
 }
 
 async function loadTemplateOrFile(spec: string): Promise<unknown> {
-  if (spec in templates) {
-    return templates[spec]!.document
+  if (Object.hasOwn(templates, spec)) {
+    // Pass the name through so the renderer applies template build() options.
+    return spec
   }
   const raw = await fs.readFile(spec, 'utf8')
   const parsed = JSON.parse(raw) as Record<string, unknown>

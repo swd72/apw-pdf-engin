@@ -4,7 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
-import { memo } from '@apw-pdf/templates'
+import { externalLetter, memo } from '@apw-pdf/templates'
 import {
   createServer,
   formatToolError,
@@ -330,5 +330,20 @@ describe('@apw-pdf/mcp server and tools', () => {
     expect(hugeSave.isError).toBe(true)
     const hugeContent = hugeSave.content as Array<{ type: string; text: string }>
     expect(hugeContent[0]!.text).toContain('LIMIT_EXCEEDED')
+  })
+  it('render_page_png applies external-letter paragraphSpacing for templateName (N1)', async () => {
+    const example = externalLetter.example as Record<string, unknown>
+    const renderPng = async (data: Record<string, unknown>) => {
+      const res = await client.callTool({
+        name: 'render_page_png',
+        arguments: { templateName: 'external-letter', data, dpi: 72 },
+      })
+      expect(res.isError).toBeFalsy()
+      return (res.content as Array<{ type: string; data: string }>)[0]!.data
+    }
+    const base = await renderPng(example)
+    expect(await renderPng(example)).toBe(base)
+    const spaced = await renderPng({ ...example, paragraphSpacing: '12pt' })
+    expect(spaced).not.toBe(base)
   })
 })

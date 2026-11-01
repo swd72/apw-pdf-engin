@@ -9,7 +9,7 @@ import {
 } from '@apw-pdf/core'
 import { fontsDir } from '@apw-pdf/fonts/node'
 import { createPdfEngine, type RenderPdfOptions } from '@apw-pdf/pdf'
-import { templates } from '@apw-pdf/templates'
+import { instantiateTemplate, templates } from '@apw-pdf/templates'
 import { fsFontProvider, fsImageProvider } from './providers.js'
 
 const require = createRequire(import.meta.url)
@@ -37,15 +37,18 @@ export interface Renderer {
   templates: Record<string, TemplateDef>
 }
 
-function resolveDocInput(doc: unknown): unknown {
+function resolveDocInput(
+  doc: unknown,
+  data: unknown,
+): { doc: unknown; data: unknown } {
   if (typeof doc === 'string') {
     const tpl = Object.hasOwn(templates, doc) ? templates[doc] : undefined
     if (!tpl) {
       throw new ApwPdfError('SCHEMA_INVALID', `Unknown template "${doc}"`)
     }
-    return tpl.document
+    return instantiateTemplate(tpl, data)
   }
-  return doc
+  return { doc, data }
 }
 
 export async function createRenderer(
@@ -75,16 +78,16 @@ export async function createRenderer(
   return {
     templates,
     validate(doc: unknown, data: unknown) {
-      const resolved = resolveDocInput(doc)
-      return engine.validate(resolved, data)
+      const resolved = resolveDocInput(doc, data)
+      return engine.validate(resolved.doc, resolved.data)
     },
     async render(
       doc: unknown,
       data: unknown,
       renderOpts?: RenderPdfOptions,
     ): Promise<Uint8Array> {
-      const resolved = resolveDocInput(doc)
-      const res = await engine.renderPdf(resolved, data, renderOpts)
+      const resolved = resolveDocInput(doc, data)
+      const res = await engine.renderPdf(resolved.doc, resolved.data, renderOpts)
       return res.bytes
     },
     async renderToFile(
@@ -93,8 +96,8 @@ export async function createRenderer(
       file: string,
       renderOpts?: RenderPdfOptions,
     ): Promise<{ pageCount: number; warnings: Warning[] }> {
-      const resolved = resolveDocInput(doc)
-      const res = await engine.renderPdf(resolved, data, renderOpts)
+      const resolved = resolveDocInput(doc, data)
+      const res = await engine.renderPdf(resolved.doc, resolved.data, renderOpts)
       await fs.mkdir(path.dirname(path.resolve(file)), { recursive: true })
       await fs.writeFile(file, res.bytes)
       return {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { singleLineHeight } from '@apw-pdf/core'
-import { externalLetter } from '../src/index.js'
+import { externalLetter, instantiateTemplate, memo } from '../src/index.js'
 import { findRun, getTestEngine, layoutOf } from './helpers.js'
 
 describe('externalLetter (หนังสือภายนอก) conformance', () => {
@@ -135,5 +135,20 @@ describe('externalLetter (หนังสือภายนอก) conformance',
         .map((g) => g.y),
     )
     expect(p3CustomRun.y - p2CustomLastY).toBeCloseTo(single16 + 6, 2)
+  })
+
+  it('instantiateTemplate applies build() options and falls back to document (N1)', () => {
+    const example = externalLetter.example as Record<string, unknown>
+    const plain = instantiateTemplate(externalLetter, example)
+    expect(plain.doc).toBe(externalLetter.document)
+    expect(plain.data).toBe(example)
+
+    const spaced = instantiateTemplate(externalLetter, { ...example, paragraphSpacing: '6pt' })
+    expect(spaced.doc).not.toBe(externalLetter.document)
+    const body = spaced.doc.blocks.find((b) => b.type === 'each' && b.of === 'body')
+    expect(body?.type === 'each' && body.blocks[0]).toMatchObject({ spaceBefore: '6pt' })
+
+    expect(instantiateTemplate(externalLetter, 'not-an-object').doc).toBe(externalLetter.document)
+    expect(instantiateTemplate(memo, memo.example).doc).toBe(memo.document)
   })
 })
