@@ -240,4 +240,12 @@ describe('expressions, filters, and binding', () => {
     expect(outText.endsWith(' user1@example.go.th https://a.go.th/123 ๙๙')).toBe(true)
     expect(outText.startsWith('ก๑ก๑')).toBe(true)
   })
+
+  it('enforces 5 MB data limit in UTF-8 bytes rather than UTF-16 code units (M11)', () => {
+    // 2,000,000 Thai chars is 2M UTF-16 code units (< 5M) but 6,000,000 bytes in UTF-8 (> 5 MB)
+    const twoMillionThai = 'ก'.repeat(2_000_000)
+    expect(() => bindDocument(baseDoc, { v: twoMillionThai })).toThrow(
+      expect.objectContaining({ code: 'LIMIT_EXCEEDED' }),
+    )
+  })
 })

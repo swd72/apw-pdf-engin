@@ -16,10 +16,22 @@ export interface RasterizeOptions {
   dpi?: number
 }
 
+const MAX_CANVAS_DIM = 8192
+const MAX_CANVAS_PIXELS = 25_000_000
+
+function assertCanvasBounds(w: number, h: number): void {
+  if (w > MAX_CANVAS_DIM || h > MAX_CANVAS_DIM || w * h > MAX_CANVAS_PIXELS) {
+    throw new RangeError(
+      `Canvas dimensions ${w}x${h} exceed maximum allowed size (${MAX_CANVAS_DIM}px or ${MAX_CANVAS_PIXELS} pixels)`,
+    )
+  }
+}
+
 const canvasFactory = {
   create(width: number, height: number) {
     const w = Math.max(1, Math.round(width))
     const h = Math.max(1, Math.round(height))
+    assertCanvasBounds(w, h)
     const canvas = createCanvas(w, h)
     const context = canvas.getContext('2d')
     return { canvas, context }
@@ -29,8 +41,11 @@ const canvasFactory = {
     width: number,
     height: number,
   ) {
-    target.canvas.width = Math.max(1, Math.round(width))
-    target.canvas.height = Math.max(1, Math.round(height))
+    const w = Math.max(1, Math.round(width))
+    const h = Math.max(1, Math.round(height))
+    assertCanvasBounds(w, h)
+    target.canvas.width = w
+    target.canvas.height = h
   },
   destroy(target: { canvas: Canvas | null; context: unknown }) {
     if (target.canvas) {

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { ApwPdfError } from './errors.js'
-import type { Length } from './units.js'
+import { toPt, type Length } from './units.js'
 
 const POSITIVE_LENGTH_RE = /^\d+(?:\.\d+)?(pt|mm|cm|in)$/
 const SIGNED_LENGTH_RE = /^-?\d+(?:\.\d+)?(pt|mm|cm|in)$/
@@ -12,6 +12,30 @@ export const lengthSchema: z.ZodType<Length> = z.custom<Length>(
     return false
   },
   { message: 'Invalid length (expected non-negative number or "<n>pt|mm|cm|in")' },
+)
+
+const pageDimensionSchema: z.ZodType<Length> = lengthSchema.refine(
+  (val) => {
+    try {
+      const pt = toPt(val)
+      return pt >= 72 && pt <= 5000
+    } catch {
+      return false
+    }
+  },
+  { message: 'Page dimension must be between 72pt and 5000pt' },
+)
+
+const fontSizeSchema: z.ZodType<Length> = lengthSchema.refine(
+  (val) => {
+    try {
+      const pt = toPt(val)
+      return pt >= 1 && pt <= 500
+    } catch {
+      return false
+    }
+  },
+  { message: 'Font size must be between 1pt and 500pt' },
 )
 
 export const signedLengthSchema: z.ZodType<Length> = z.custom<Length>(
@@ -106,7 +130,7 @@ const paragraphStyleFields = {
   font: z
     .object({
       family: z.string().min(1).optional(),
-      size: lengthSchema.optional(),
+      size: fontSizeSchema.optional(),
       bold: z.boolean().optional(),
       italic: z.boolean().optional(),
       color: z.string().optional(),
@@ -150,7 +174,7 @@ const textRunSchema = z.object({
   bold: z.boolean().optional(),
   italic: z.boolean().optional(),
   underline: z.union([z.boolean(), z.literal('dotted')]).optional(),
-  size: lengthSchema.optional(),
+  size: fontSizeSchema.optional(),
   family: z.string().min(1).optional(),
   color: z.string().optional(),
   anchors: z.array(anchorSchema).optional(),
@@ -547,7 +571,7 @@ export const documentSchema: z.ZodType<DocumentDef> = z.object({
   page: z.object({
     size: z.union([
       z.enum(['A4', 'A5', 'Letter', 'Legal']),
-      z.object({ width: lengthSchema, height: lengthSchema }),
+      z.object({ width: pageDimensionSchema, height: pageDimensionSchema }),
     ]),
     orientation: z.enum(['portrait', 'landscape']).optional(),
     margin: z.object({
@@ -559,7 +583,7 @@ export const documentSchema: z.ZodType<DocumentDef> = z.object({
   }),
   font: z.object({
     family: z.string().min(1),
-    size: lengthSchema,
+    size: fontSizeSchema,
     lineSpacing: lineSpacingSchema.optional(),
     color: z.string().optional(),
   }),
@@ -569,7 +593,7 @@ export const documentSchema: z.ZodType<DocumentDef> = z.object({
       from: z.number().int().positive().optional(),
       position: z.enum(['top-center', 'bottom-center', 'top-right', 'bottom-right']).optional(),
       format: z.string().optional(),
-      size: lengthSchema.optional(),
+      size: fontSizeSchema.optional(),
       offset: lengthSchema.optional(),
     })
     .optional(),

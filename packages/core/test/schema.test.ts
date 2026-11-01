@@ -162,4 +162,25 @@ describe('schema', () => {
       }),
     )
   })
+
+  it('rejects oversized custom page dimensions (>5000pt) and oversized font sizes (>500pt) (M10)', () => {
+    expect(() =>
+      parseDocument({
+        ...baseDoc,
+        page: {
+          size: { width: '10000cm', height: '10000cm' },
+          margin: baseDoc.page.margin,
+        },
+        blocks: [{ type: 'paragraph', text: 'x' }],
+      }),
+    ).toThrow(expect.objectContaining({ code: 'SCHEMA_INVALID' }))
+
+    expect(() =>
+      parseDocument({
+        ...baseDoc,
+        font: { family: 'THSarabunIT9', size: '1000pt' },
+        blocks: [{ type: 'paragraph', text: 'x' }],
+      }),
+    ).toThrow(expect.objectContaining({ code: 'SCHEMA_INVALID' }))
+  })
 })

@@ -283,4 +283,49 @@ describe('@apw-pdf/mcp server and tools', () => {
     expect(formatted.content[0]!.text).not.toContain('C:\\Users\\secret')
     expect(formatted.content[0]!.text).not.toContain('private.json')
   })
+
+  it('save_template rejects payloads over 1 MB and prevents silent overwrite unless overwrite:true (M11)', async () => {
+    const firstSave = await client.callTool({
+      name: 'save_template',
+      arguments: {
+        name: 'custom-one',
+        template: memo.document as unknown as Record<string, unknown>,
+      },
+    })
+    expect(firstSave.isError).toBeFalsy()
+
+    // Second save without overwrite:true fails instead of silently overwriting
+    const dupSave = await client.callTool({
+      name: 'save_template',
+      arguments: {
+        name: 'custom-one',
+        template: memo.document as unknown as Record<string, unknown>,
+      },
+    })
+    expect(dupSave.isError).toBe(true)
+
+    // With overwrite:true it succeeds
+    const overwriteSave = await client.callTool({
+      name: 'save_template',
+      arguments: {
+        name: 'custom-one',
+        template: memo.document as unknown as Record<string, unknown>,
+        overwrite: true,
+      },
+    })
+    expect(overwriteSave.isError).toBeFalsy()
+
+    // Oversized example (> 1 MB) is rejected with LIMIT_EXCEEDED
+    const hugeSave = await client.callTool({
+      name: 'save_template',
+      arguments: {
+        name: 'huge-tpl',
+        template: memo.document as unknown as Record<string, unknown>,
+        example: { big: 'x'.repeat(1_200_000) },
+      },
+    })
+    expect(hugeSave.isError).toBe(true)
+    const hugeContent = hugeSave.content as Array<{ type: string; text: string }>
+    expect(hugeContent[0]!.text).toContain('LIMIT_EXCEEDED')
+  })
 })

@@ -122,7 +122,7 @@ export function bindDocument(
   const warnings: Warning[] = []
 
   const serialized = JSON.stringify(data ?? {})
-  if (serialized && serialized.length > MAX_DATA_BYTES) {
+  if (serialized && new TextEncoder().encode(serialized).byteLength > MAX_DATA_BYTES) {
     throw new ApwPdfError('LIMIT_EXCEEDED', 'Input data exceeds 5 MB limit')
   }
 

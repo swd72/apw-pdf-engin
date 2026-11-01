@@ -355,32 +355,57 @@ export async function createServer(opts: ServerOptions): Promise<McpServer> {
         description: z.string().optional(),
         dataSchema: z.record(z.unknown()).optional(),
         example: z.unknown().optional(),
+        overwrite: z.boolean().optional(),
       },
     },
-    async ({ name, template, description, dataSchema, example }) => {
+    async ({ name, template, description, dataSchema, example, overwrite }) => {
       try {
         if (!opts.templateDir) {
           throw new PathNotAllowedError('APW_PDF_TEMPLATE_DIR is not configured')
         }
         validateTemplateName(name)
+        if (Object.hasOwn(builtinTemplates, name)) {
+          throw new ApwPdfError(
+            'SCHEMA_INVALID',
+            `Cannot overwrite builtin template "${name}"`,
+            { path: 'name' },
+          )
+        }
         const parsedDoc = parseDocument(template)
+        const payload = JSON.stringify(
+          {
+            name,
+            description: description ?? `Saved template ${name}`,
+            document: parsedDoc,
+            dataSchema: dataSchema ?? {},
+            example: example ?? {},
+          },
+          null,
+          2,
+        )
+        if (Buffer.byteLength(payload, 'utf8') > 1024 * 1024) {
+          throw new ApwPdfError(
+            'LIMIT_EXCEEDED',
+            'Saved template payload exceeds 1 MB limit',
+          )
+        }
         const targetPath = resolveInside(opts.templateDir, `${name}.json`)
         await fs.mkdir(opts.templateDir, { recursive: true })
-        await fs.writeFile(
-          targetPath,
-          JSON.stringify(
-            {
-              name,
-              description: description ?? `Saved template ${name}`,
-              document: parsedDoc,
-              dataSchema: dataSchema ?? {},
-              example: example ?? {},
-            },
-            null,
-            2,
-          ),
-          'utf8',
-        )
+        try {
+          await fs.writeFile(targetPath, payload, {
+            encoding: 'utf8',
+            flag: overwrite ? 'w' : 'wx',
+          })
+        } catch (err: any) {
+          if (err && err.code === 'EEXIST') {
+            throw new ApwPdfError(
+              'SCHEMA_INVALID',
+              `Template "${name}" already exists (pass overwrite: true to replace)`,
+              { path: 'name' },
+            )
+          }
+          throw err
+        }
         return {
           content: [
             {
