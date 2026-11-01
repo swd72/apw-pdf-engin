@@ -51,7 +51,7 @@ export interface ResolvedTable extends Omit<TableBlock, 'header' | 'rows' | 'foo
 
 export interface ResolvedColumns {
   type: 'columns'
-  columns: { width: ColumnWidthSpec; blocks: ResolvedBlock[] }[]
+  columns: { width: ColumnWidthSpec; align?: 'left' | 'right'; blocks: ResolvedBlock[] }[]
   gap?: Length
   keepTogether?: boolean
 }
@@ -336,6 +336,7 @@ export function bindDocument(
             ...b,
             columns: b.columns.map((col, cIdx) => ({
               width: col.width,
+              ...(col.align ? { align: col.align } : {}),
               blocks: bindBlocks(col.blocks, scope, `${path}.columns[${cIdx}].blocks`),
             })),
           })

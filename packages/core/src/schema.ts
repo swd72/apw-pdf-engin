@@ -298,7 +298,7 @@ export interface TableBlock {
 
 export interface ColumnsBlock {
   type: 'columns'
-  columns: { width: ColumnWidthSpec; blocks: Block[] }[]
+  columns: { width: ColumnWidthSpec; align?: 'left' | 'right'; blocks: Block[] }[]
   gap?: Length
   keepTogether?: boolean
 }
@@ -432,6 +432,7 @@ const columnsBlockSchema = z.object({
   columns: z.array(
     z.object({
       width: columnWidthSpecSchema,
+      align: z.enum(['left', 'right']).optional(),
       blocks: z.lazy(() => z.array(blockSchema)),
     }),
   ),

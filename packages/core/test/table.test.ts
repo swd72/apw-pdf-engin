@@ -247,4 +247,69 @@ describe('tables and columns', () => {
     // Next block starts after max column height (2 lines on right)
     expect(afterG.y - leftG.y).toBeCloseTo(2 * 18.08, 2)
   })
+
+  it('right-aligns each align:right paragraph in a column individually unless column align:right is set (M7)', async () => {
+    const ctx = makeFlowCtx({
+      ...baseDocSpec,
+      blocks: [
+        {
+          type: 'columns',
+          gap: 0,
+          columns: [
+            {
+              width: '50%',
+              blocks: [{ type: 'paragraph', text: 'ซ้าย' }],
+            },
+            {
+              width: '50%',
+              blocks: [
+                { type: 'paragraph', align: 'right', text: 'บรรทัดแรกที่ยาวกว่ามาก' },
+                { type: 'paragraph', align: 'right', text: 'สั้น' },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+    const pages = await paginate(ctx.doc.blocks, ctx)
+    const glyphs = pages[0]!.items.filter((it) => it.kind === 'glyphs')
+    const longG = glyphs.find((g) => g.text === 'บรรทัดแรกที่ยาวกว่ามาก')!
+    const shortG = glyphs.find((g) => g.text === 'สั้น')!
+    const rightEdge = 85.0394 + 453.5433
+    const longEnd = longG.x + longG.glyphs.reduce((s, gl) => s + gl.advance, 0)
+    const shortEnd = shortG.x + shortG.glyphs.reduce((s, gl) => s + gl.advance, 0)
+
+    // Both right-aligned paragraphs must touch the right edge of the column
+    expect(longEnd).toBeCloseTo(rightEdge, 2)
+    expect(shortEnd).toBeCloseTo(rightEdge, 2)
+    expect(shortG.x).toBeGreaterThan(longG.x + 10)
+
+    // With explicit column align: 'right', the block is shifted right and lines share left edge
+    const ctxBlock = makeFlowCtx({
+      ...baseDocSpec,
+      blocks: [
+        {
+          type: 'columns',
+          gap: 0,
+          columns: [
+            { width: '50%', blocks: [{ type: 'paragraph', text: 'ซ้าย' }] },
+            {
+              width: '50%',
+              align: 'right',
+              blocks: [
+                { type: 'paragraph', text: 'บรรทัดแรกที่ยาวกว่ามาก' },
+                { type: 'paragraph', text: 'สั้น' },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+    const pagesBlock = await paginate(ctxBlock.doc.blocks, ctxBlock)
+    const glyphsBlock = pagesBlock[0]!.items.filter((it) => it.kind === 'glyphs')
+    const longB = glyphsBlock.find((g) => g.text === 'บรรทัดแรกที่ยาวกว่ามาก')!
+    const shortB = glyphsBlock.find((g) => g.text === 'สั้น')!
+    expect(longB.x + longB.glyphs.reduce((s, gl) => s + gl.advance, 0)).toBeCloseTo(rightEdge, 2)
+    expect(shortB.x).toBeCloseTo(longB.x, 2)
+  })
 })

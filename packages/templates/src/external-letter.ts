@@ -66,6 +66,7 @@ const externalLetterDocument: DocumentDef = {
         },
         {
           width: '50%',
+          align: 'right',
           blocks: [
             {
               type: 'each',
@@ -74,7 +75,6 @@ const externalLetterDocument: DocumentDef = {
               blocks: [
                 {
                   type: 'paragraph',
-                  align: 'right',
                   text: '{{addrLine}}',
                 },
               ],

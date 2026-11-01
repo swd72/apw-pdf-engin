@@ -34,9 +34,7 @@ export async function layoutColumns(
     const placements: { frag: Fragment; offsetTop: number }[] = []
     let currY = 0
 
-    const isRightAlignedBlock =
-      col.blocks.length > 0 &&
-      col.blocks.every((b) => b.type === 'paragraph' && b.align === 'right')
+    const isRightAlignedBlock = col.align === 'right' && col.blocks.length > 0
 
     for (let bIdx = 0; bIdx < col.blocks.length; bIdx++) {
       const blk = col.blocks[bIdx]!
