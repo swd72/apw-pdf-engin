@@ -63,6 +63,61 @@ describe('paragraph layout', () => {
     expect(layout.lines[1]!.runs[0]!.x).toBeCloseTo(85.0394 + 56.6929, 2)
   })
 
+  it('treats indentLeftX as implicit tab stop for hanging indent and measures default 36pt tabs from indentLeftX (M5)', async () => {
+    const { layout } = await layoutParagraph(
+      {
+        type: 'paragraph',
+        indentLeft: '2cm',
+        firstLineIndent: '-1cm',
+        runs: [
+          { text: '1.' },
+          { tab: true },
+          {
+            text: 'รายการลำดับที่หนึ่งที่มีข้อความยาวพอให้ตัดขึ้นบรรทัดใหม่เพื่อตรวจสอบการตรงกันของแนวข้อความหลังแท็บกับบรรทัดถัดไป',
+          },
+        ],
+      },
+      {
+        fonts,
+        base: baseFont,
+        dictionary: [],
+        contentLeft: 85.0394,
+        contentWidth: 453.5433,
+        anchors: createAnchorTable(),
+        path: 'blocks[0]',
+      },
+    )
+    expect(layout.lines.length).toBeGreaterThanOrEqual(2)
+    const indentLeftX = 85.0394 + 56.6929
+    // On line 0, the run after the tab ('รายการ...') aligns with indentLeftX
+    expect(layout.lines[0]!.runs[1]!.x).toBeCloseTo(indentLeftX, 2)
+    // On line 1, the wrapped text also starts at indentLeftX
+    expect(layout.lines[1]!.runs[0]!.x).toBeCloseTo(indentLeftX, 2)
+
+    // Default 36pt tab intervals are measured from indentLeftX, not first-line startX
+    const { layout: layoutPosIndent } = await layoutParagraph(
+      {
+        type: 'paragraph',
+        indentLeft: '1cm',
+        firstLineIndent: '10pt',
+        runs: [{ text: 'ก' }, { tab: true }, { text: 'ข' }],
+      },
+      {
+        fonts,
+        base: baseFont,
+        dictionary: [],
+        contentLeft: 100,
+        contentWidth: 400,
+        anchors: createAnchorTable(),
+        path: 'blocks[1]',
+      },
+    )
+    const posIndentLeftX = 100 + 28.3465
+    // First-line starts at posIndentLeftX + 10pt, 'ก' is ~6pt wide -> ~16pt past posIndentLeftX,
+    // so next default 36pt tab measured from posIndentLeftX is posIndentLeftX + 36
+    expect(layoutPosIndent.lines[0]!.runs[1]!.x).toBeCloseTo(posIndentLeftX + 36, 2)
+  })
+
   it('uses tallest run on a line for line height', async () => {
     const f20 = await fonts.get('THSarabunIT9', true, false)
     const { layout } = await layoutParagraph(

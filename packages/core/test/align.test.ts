@@ -302,4 +302,28 @@ describe('line placement: alignment, tabs, anchors, Thai Distributed', () => {
       expect(fillRun.x).toBeCloseTo(expectedCenter, 2)
     }
   })
+
+  it('applies thaiDistributed cluster weight after numeric fill and pageNumber items so line reaches right margin (M6)', async () => {
+    const { items } = await buildInlineItems(
+      {
+        type: 'paragraph',
+        runs: [
+          { text: 'ข้อความนำ' },
+          { fill: '๑๒', width: '1cm', leader: 'dots' },
+          { text: 'คั่นกลาง' },
+          { pageNumber: true },
+          { text: 'ท้ายบรรทัด' },
+        ],
+      },
+      { fonts, base: baseFont, dictionary: [], path: 'blocks[0]' },
+    )
+    const tab = defaultTabCtx(85.04, 85.04 + 300)
+    const runs = placeLine(
+      { items, isLast: false, endsWithBreak: false },
+      { x: 85.04, width: 300, align: 'thaiDistributed', tab, anchors: createAnchorTable() },
+    )
+    const lastRun = runs[runs.length - 1]!
+    const rightEdge = lastRun.x + lastRun.glyphs.reduce((s, g) => s + g.advance, 0)
+    expect(rightEdge).toBeCloseTo(85.04 + 300, 2)
+  })
 })

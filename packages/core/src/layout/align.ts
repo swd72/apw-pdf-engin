@@ -32,6 +32,7 @@ export interface ResolvedTabStop {
 
 export interface TabCtx {
   lineStartX: number
+  indentLeftX?: number
   tabs: ResolvedTabStop[]
   defaultInterval: 36
   contentRight: number
@@ -115,16 +116,28 @@ export function resolveTabStops(
 }
 
 function findNextTabStop(currentX: number, ctx: TabCtx): ResolvedTabStop {
+  const originX = ctx.indentLeftX ?? ctx.lineStartX
+  const implicitHangingStop =
+    originX > currentX + 1e-4
+      ? ({ at: originX, align: 'left', leader: 'none' } as const)
+      : undefined
+
   for (const t of ctx.tabs) {
     if (t.at > currentX + 1e-4) {
+      if (implicitHangingStop && implicitHangingStop.at < t.at - 1e-4) {
+        return implicitHangingStop
+      }
       return t
     }
   }
+  if (implicitHangingStop) {
+    return implicitHangingStop
+  }
   const interval = ctx.defaultInterval || 36
-  const rel = Math.max(0, currentX - ctx.lineStartX)
+  const rel = Math.max(0, currentX - originX)
   const nextMult = Math.floor(rel / interval + 1e-6) + 1
   return {
-    at: ctx.lineStartX + nextMult * interval,
+    at: originX + nextMult * interval,
     align: 'left',
     leader: 'none',
   }
@@ -263,6 +276,7 @@ export function placeLine(
 
   const tabCtx: TabCtx = {
     ...opts.tab,
+    indentLeftX: opts.tab.indentLeftX ?? opts.tab.lineStartX,
     lineStartX: opts.x,
   }
 
@@ -488,6 +502,10 @@ export function placeLine(
       }
 
       if (it.kind === 'fill') {
+        const extraAfter =
+          unitExtra > 0 && nextIt && nextIt.kind !== 'space'
+            ? unitExtra * DISTRIBUTE_WEIGHTS.cluster
+            : 0
         let fillW: number
         if (it.widthSpec === 'toTab') {
           const nextTab = findNextTabStop(cursorX, tabCtx)
@@ -536,7 +554,7 @@ export function placeLine(
           })
         }
 
-        cursorX = fillEndX
+        cursorX = fillEndX + extraAfter
         continue
       }
 
@@ -601,24 +619,28 @@ export function placeLine(
       }
 
       if (it.kind === 'pageNumber' || it.kind === 'pageCount') {
+        const extraAfter =
+          unitExtra > 0 && nextIt && nextIt.kind !== 'space'
+            ? unitExtra * DISTRIBUTE_WEIGHTS.cluster
+            : 0
         const placeholder = it.font.shape('00', it.size)
         runs.push({
           font: it.font,
           size: it.size,
           color: it.color,
           x: cursorX,
-          glyphs: placeholder.glyphs.map((g) => ({
+          glyphs: placeholder.glyphs.map((g, gIdx) => ({
             id: g.id,
             dx: g.dx,
             dy: g.dy,
-            advance: g.advance,
+            advance: g.advance + (gIdx === placeholder.glyphs.length - 1 ? extraAfter : 0),
           })),
           text: it.kind === 'pageNumber' ? '{{pageNumber}}' : '{{pageCount}}',
           clusters: placeholder.glyphs.map((g) => g.cluster),
           path: it.path,
           tokenKind: it.kind,
         })
-        cursorX += it.width
+        cursorX += it.width + extraAfter
         continue
       }
     }

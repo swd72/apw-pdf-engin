@@ -97,6 +97,7 @@ export async function layoutParagraph(
   const resolvedTabs = resolveTabStops(merged.tabs, indentLeftX, ctx.anchors, ctx.path)
   const baseTabCtx: TabCtx = {
     lineStartX: indentLeftX,
+    indentLeftX,
     tabs: resolvedTabs,
     defaultInterval: 36,
     contentRight,
