@@ -52,7 +52,6 @@ export async function layoutSignature(
   }
 
   const nameW = nameShaped.width
-  const nameCenterX = startX + nameW / 2
 
   const hasPrefix = Boolean(s.prefix && s.prefix.length > 0)
   const hasImage = Boolean(s.image && s.image.length > 0)
@@ -69,6 +68,17 @@ export async function layoutSignature(
       })
     }
   }
+
+  const prefixW = prefixShaped ? prefixShaped.width : 0
+  const sigLineStartX = hasPrefix ? startX + prefixW + 4 : startX
+  const sigLineW = hasPrefix
+    ? Math.min(toPt('6cm'), Math.max(0, x + width - sigLineStartX))
+    : 0
+  const sigLineEndX = sigLineStartX + sigLineW
+
+  const nameCenterX =
+    hasPrefix && sigLineW > 0 ? (sigLineStartX + sigLineEndX) / 2 : startX + nameW / 2
+  const nameX = hasPrefix && sigLineW > 0 ? nameCenterX - nameW / 2 : startX
 
   let imgDims: { resolvedSrc: string; w: number; h: number } | undefined
   if (hasImage && s.image) {
@@ -112,13 +122,12 @@ export async function layoutSignature(
 
       if (hasTopRow) {
         if (prefixShaped && s.prefix) {
-          const prefixX = startX - 0.5 * size - prefixShaped.width
           out.push({
             kind: 'glyphs',
             font: font.id,
             size,
             color,
-            x: prefixX,
+            x: startX,
             y: currY + ascent,
             glyphs: prefixShaped.glyphs.map((g) => ({
               id: g.id,
@@ -130,6 +139,18 @@ export async function layoutSignature(
             clusters: prefixShaped.glyphs.map((g) => g.cluster),
             sourcePath: path,
           })
+          if (!hasImage && sigLineW > 0) {
+            out.push({
+              kind: 'line',
+              x1: sigLineStartX,
+              y1: currY + ascent,
+              x2: sigLineEndX,
+              y2: currY + ascent,
+              width: 0.5,
+              dash: [1, 2],
+              color,
+            })
+          }
         }
         if (imgDims && s.image) {
           const imgX = nameCenterX - imgDims.w / 2
@@ -152,7 +173,7 @@ export async function layoutSignature(
         font: font.id,
         size,
         color,
-        x: startX,
+        x: nameX,
         y: currY + ascent,
         glyphs: nameShaped.glyphs.map((g) => ({
           id: g.id,

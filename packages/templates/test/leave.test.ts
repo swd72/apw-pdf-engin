@@ -124,6 +124,48 @@ describe('leave templates (ใบลาป่วย/กิจ/คลอด แ�
     expect(findRun(tree, 'คลอดบุตร')).toBeDefined()
   })
 
+  it('renders 6cm dotted signature lines after (ลงชื่อ), ผู้ตรวจสอบ label, date lines, and vacation substitute position/signature (T1, T2)', async () => {
+    const sickTree = await layoutOf(
+      leaveSickPersonalMaternity,
+      leaveSickPersonalMaternity.example,
+    )
+    const sickItems = sickTree.pages[0]!.items
+    const signPrefixes = sickItems.filter(
+      (i): i is Extract<typeof i, { kind: 'glyphs' }> =>
+        i.kind === 'glyphs' && i.text === '(ลงชื่อ)',
+    )
+    expect(signPrefixes.length).toBe(4)
+
+    // Each (ลงชื่อ) has a ~6cm (170.08pt) dotted signature line on the same baseline
+    const dottedLines = sickItems.filter(
+      (i): i is Extract<typeof i, { kind: 'line' }> =>
+        i.kind === 'line' && Array.isArray(i.dash) && i.dash.length > 0,
+    )
+    for (const prefix of signPrefixes) {
+      const sigLine = dottedLines.find(
+        (l) => Math.abs(l.y1 - prefix.y) < 1 && l.x1 > prefix.x,
+      )
+      expect(sigLine).toBeDefined()
+      expect(sigLine!.x2 - sigLine!.x1).toBeCloseTo(170.08, 0)
+    }
+
+    // Checker label ผู้ตรวจสอบ is present even when checker.position is provided
+    expect(findRun(sickTree, 'ผู้ตรวจสอบ')).toBeDefined()
+    expect(findRun(sickTree, 'ตำแหน่ง เจ้าพนักงานธุรการชำนาญงาน')).toBeDefined()
+
+    // Checker, supervisor, and approver each have a วันที่ ......../......../........ line
+    const dateLines = sickItems.filter(
+      (i): i is Extract<typeof i, { kind: 'glyphs' }> =>
+        i.kind === 'glyphs' && i.text.startsWith('วันที่ ') && i.text.includes('/'),
+    )
+    expect(dateLines.length).toBe(3)
+
+    // Vacation leave binds substitute.position and renders ผู้รับมอบ signature
+    const vacTree = await layoutOf(leaveVacation, leaveVacation.example)
+    expect(findRun(vacTree, 'ตำแหน่ง นักวิเคราะห์นโยบายและแผนปฏิบัติการ')).toBeDefined()
+    expect(findRun(vacTree, 'ผู้รับมอบ')).toBeDefined()
+  })
+
   it('exports templates with exactly 4 keys and validates every example against its dataSchema', () => {
     const keys = Object.keys(templates)
     expect(keys).toEqual([

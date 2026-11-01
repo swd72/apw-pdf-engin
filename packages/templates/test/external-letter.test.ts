@@ -109,4 +109,39 @@ describe('externalLetter (หนังสือภายนอก) conformance',
     expect(ownerRun.x).toBeCloseTo(85.04, 2)
     expect(ownerRun.y).toBeGreaterThan(sigNameRun.y)
   })
+
+  it('uses 0pt spacing between body paragraphs by default and supports paragraphSpacing option (T3)', async () => {
+    const engine = await getTestEngine()
+    const font = await engine.fonts.get('THSarabunIT9', false, false)
+    const single16 = singleLineHeight(font.metrics, 16)
+
+    const treeDefault = await layoutOf(externalLetter, externalLetter.example)
+    const { item: p2FirstRun } = findRun(treeDefault, 'กรมบัญชีกลางขอเรียนว่า')
+    const { item: p3FirstRun } = findRun(treeDefault, 'จึงเรียนมาเพื่อโปรดทราบ')
+    const glyphsDefault = treeDefault.pages[0]!.items.filter(
+      (i): i is Extract<typeof i, { kind: 'glyphs' }> => i.kind === 'glyphs',
+    )
+    const p2LastLineY = Math.max(
+      ...glyphsDefault
+        .filter((g) => g.y >= p2FirstRun.y && g.y < p3FirstRun.y - 1)
+        .map((g) => g.y),
+    )
+    expect(p3FirstRun.y - p2LastLineY).toBeCloseTo(single16, 2)
+
+    const builtCustom = externalLetter.build({
+      ...(externalLetter.example as any),
+      paragraphSpacing: '6pt',
+    })
+    const treeCustom = await engine.layout(builtCustom.doc, builtCustom.data)
+    const { item: p3CustomRun } = findRun(treeCustom, 'จึงเรียนมาเพื่อโปรดทราบ')
+    const glyphsCustom = treeCustom.pages[0]!.items.filter(
+      (i): i is Extract<typeof i, { kind: 'glyphs' }> => i.kind === 'glyphs',
+    )
+    const p2CustomLastY = Math.max(
+      ...glyphsCustom
+        .filter((g) => g.y < p3CustomRun.y - 1)
+        .map((g) => g.y),
+    )
+    expect(p3CustomRun.y - p2CustomLastY).toBeCloseTo(single16 + 6, 2)
+  })
 })

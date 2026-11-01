@@ -1,4 +1,4 @@
-import type { DocumentDef } from '@apw-pdf/core'
+import type { DocumentDef, Length } from '@apw-pdf/core'
 import {
   defineTemplate,
   GOV_FONT,
@@ -17,6 +17,7 @@ export interface ExternalLetterInput {
   reference?: string
   enclosures?: string[]
   body: string[]
+  paragraphSpacing?: Length
   closing?: string
   signer: {
     name: string
@@ -130,7 +131,6 @@ const externalLetterDocument: DocumentDef = {
       blocks: [
         {
           type: 'paragraph',
-          spaceBefore: '6pt',
           align: 'thaiDistributed',
           firstLineIndent: PARA_INDENT,
           text: '{{p}}',
@@ -213,6 +213,7 @@ const externalLetterDataSchema = {
     reference: { type: 'string' },
     enclosures: { type: 'array', items: { type: 'string' } },
     body: { type: 'array', items: { type: 'string' } },
+    paragraphSpacing: { type: ['string', 'number'] },
     closing: { type: 'string' },
     signer: {
       type: 'object',
@@ -274,6 +275,29 @@ export const externalLetter = defineTemplate<ExternalLetterInput>({
   dataSchema: externalLetterDataSchema,
   example: externalLetterExample,
   build(input: ExternalLetterInput) {
+    if (
+      input.paragraphSpacing !== undefined &&
+      input.paragraphSpacing !== 0 &&
+      input.paragraphSpacing !== '0pt'
+    ) {
+      const customBlocks = externalLetterDocument.blocks.map((b) => {
+        if (b.type === 'each' && b.of === 'body') {
+          return {
+            ...b,
+            blocks: b.blocks.map((inner) =>
+              inner.type === 'paragraph'
+                ? { ...inner, spaceBefore: input.paragraphSpacing }
+                : inner,
+            ),
+          }
+        }
+        return b
+      })
+      return {
+        doc: { ...externalLetterDocument, blocks: customBlocks },
+        data: input,
+      }
+    }
     return {
       doc: externalLetterDocument,
       data: input,

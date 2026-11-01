@@ -209,7 +209,7 @@ const leaveSickDocument: DocumentDef = {
       minLinesBefore: 1,
       prefix: '(ลงชื่อ)',
       name: '{{name}}',
-      positions: ['{{position}}'],
+      positions: ['ตำแหน่ง {{position}}'],
     },
     {
       type: 'columns',
@@ -251,14 +251,20 @@ const leaveSickDocument: DocumentDef = {
               },
             },
             {
+              type: 'paragraph',
+              spaceBefore: '4pt',
+              runs: [{ text: 'ผู้ตรวจสอบ', bold: true }],
+            },
+            {
               type: 'signature',
-              startAt: '1.5cm',
+              startAt: '0cm',
               linesBefore: 2,
               minLinesBefore: 1,
               prefix: '(ลงชื่อ)',
               name: '{{checker.name | default:"................................"}}',
               positions: [
-                '{{checker.position | default:"ผู้ตรวจสอบ"}}',
+                'ตำแหน่ง {{checker.position | default:"................................"}}',
+                'วันที่ ......../......../........',
               ],
             },
           ],
@@ -282,13 +288,14 @@ const leaveSickDocument: DocumentDef = {
             },
             {
               type: 'signature',
-              startAt: '2cm',
+              startAt: '0.3cm',
               linesBefore: 2,
               minLinesBefore: 1,
               prefix: '(ลงชื่อ)',
               name: '{{supervisor.name | default:"................................"}}',
               positions: [
-                '{{supervisor.position | default:"หัวหน้ากลุ่มงาน"}}',
+                'ตำแหน่ง {{supervisor.position | default:"หัวหน้ากลุ่มงาน"}}',
+                'วันที่ ......../......../........',
               ],
             },
             {
@@ -304,13 +311,14 @@ const leaveSickDocument: DocumentDef = {
             },
             {
               type: 'signature',
-              startAt: '2cm',
+              startAt: '0.3cm',
               linesBefore: 2,
               minLinesBefore: 1,
               prefix: '(ลงชื่อ)',
               name: '{{approver.name | default:"................................"}}',
               positions: [
-                '{{approver.position | default:"ผู้อำนวยการ"}}',
+                'ตำแหน่ง {{approver.position | default:"ผู้อำนวยการ"}}',
+                'วันที่ ......../......../........',
               ],
             },
           ],
