@@ -104,8 +104,10 @@ export function breakLines(
     }
   }
 
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i]!
+  const workItems: InlineItem[] = [...items]
+
+  for (let i = 0; i < workItems.length; i++) {
+    const item = workItems[i]!
 
     if (item.kind === 'break') {
       pushLine(true)
@@ -131,6 +133,22 @@ export function breakLines(
       continue
     }
 
+    if (item.kind === 'fill' && item.tokens && item.tokens.length > 0) {
+      const emptyShaped = item.font.shape('', item.size)
+      const trailingLeader: InlineItem = {
+        ...item,
+        text: '',
+        shaped: emptyShaped,
+        width: 0,
+        widthSpec: typeof item.widthSpec === 'number' ? 0 : item.widthSpec,
+        leader: typeof item.widthSpec === 'number' ? 'none' : item.leader,
+        tokens: [],
+      }
+      workItems.splice(i, 1, ...item.tokens, trailingLeader)
+      i--
+      continue
+    }
+
     const nonSpaceCurrent = trimTrailingSpaces(current)
     if (nonSpaceCurrent.length > 0) {
       pushLine(false)
@@ -146,7 +164,11 @@ export function breakLines(
     }
   }
 
-  if (current.length > 0 || lines.length === 0 || items[items.length - 1]?.kind === 'break') {
+  if (
+    current.length > 0 ||
+    lines.length === 0 ||
+    workItems[workItems.length - 1]?.kind === 'break'
+  ) {
     pushLine(false)
   }
 

@@ -206,7 +206,7 @@ export function naturalWidth(items: InlineItem[], ctx: TabCtx): number {
           const fillW = Math.max(it.shaped.width, ctx.contentRight - cursorX)
           cursorX += fillW
         } else {
-          cursorX += it.widthSpec
+          cursorX += Math.max(it.shaped.width, it.widthSpec)
         }
       } else {
         cursorX += it.width

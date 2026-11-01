@@ -54,6 +54,7 @@ export interface FillInlineItem {
   color: string
   shaped: ShapedRun
   width: number
+  tokens?: (WordInlineItem | SpaceInlineItem)[]
   path: string
 }
 
@@ -223,7 +224,43 @@ export async function buildInlineItems(
           path: ctx.path,
         })
       }
-      const width = typeof widthSpec === 'number' ? widthSpec : shaped.width
+      const tokens: (WordInlineItem | SpaceInlineItem)[] = []
+      if (run.fill.length > 0) {
+        const segs = segmentWords(run.fill, ctx.dictionary)
+        for (const tok of segs) {
+          if (isWhitespaceToken(tok)) {
+            const clusters = graphemeClusters(tok)
+            const singleSpaceShaped = font.shape(' ', size)
+            for (let s = 0; s < clusters.length; s++) {
+              tokens.push({
+                kind: 'space',
+                text: ' ',
+                font,
+                size,
+                color: paraFont.color,
+                shaped: singleSpaceShaped,
+                width: singleSpaceShaped.width,
+                path: runPath,
+              })
+            }
+          } else {
+            const tokShaped = font.shape(tok, size)
+            tokens.push({
+              kind: 'word',
+              text: tok,
+              font,
+              size,
+              color: paraFont.color,
+              shaped: tokShaped,
+              anchors: [],
+              width: tokShaped.width,
+              path: runPath,
+            })
+          }
+        }
+      }
+      const width =
+        typeof widthSpec === 'number' ? Math.max(widthSpec, shaped.width) : shaped.width
       items.push({
         kind: 'fill',
         text: run.fill,
@@ -235,6 +272,7 @@ export async function buildInlineItems(
         color: paraFont.color,
         shaped,
         width,
+        tokens,
         path: runPath,
       })
       continue

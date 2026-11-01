@@ -131,4 +131,88 @@ describe('inline items and greedy line breaking', () => {
     const { lines } = breakLines(items, () => 400, sumWidth)
     expect(lines).toEqual([{ items: [], isLast: true, endsWithBreak: false }])
   })
+
+  it('wraps long fill text across lines with leader on remaining width of last line and warns on unbreakable token (C1)', async () => {
+    const { layoutParagraph } = await import('../src/layout/paragraph.js')
+    const { createAnchorTable } = await import('../src/layout/align.js')
+    const longSubject =
+      'ขออนุมัติจัดซื้อวัสดุสำนักงานประจำไตรมาสที่ ๑ เพื่อใช้ในการปฏิบัติราชการของกลุ่มงานบริหารทั่วไป สำนักงานเลขานุการกรม ประจำปีงบประมาณ พ.ศ. ๒๕๗๐ ครั้งที่ ๑'
+    expect(longSubject.length).toBeGreaterThanOrEqual(140)
+
+    const { layout, warnings } = await layoutParagraph(
+      {
+        type: 'paragraph',
+        runs: [
+          { text: 'เรื่อง', bold: true, size: '20pt' },
+          { text: '  ' },
+          { fill: longSubject, width: 'toEnd', leader: 'dots' },
+        ],
+      },
+      {
+        fonts,
+        base: baseFont,
+        dictionary: [],
+        contentLeft: 85.0394,
+        contentWidth: 453.5433,
+        anchors: createAnchorTable(),
+        path: 'blocks[4]',
+      },
+    )
+
+    expect(warnings).toEqual([])
+    expect(layout.lines.length).toBeGreaterThanOrEqual(2)
+    // Line 0 starts with 'เรื่อง' and already includes fill words on the same line
+    expect(layout.lines[0]!.runs[0]!.text).toContain('เรื่อง')
+    expect(layout.lines[0]!.runs.map((r) => r.text).join('')).toContain('ขออนุมัติ')
+
+    const contentRight = 85.0394 + 453.5433
+    for (const line of layout.lines) {
+      for (const run of line.runs) {
+        const endX = run.x + run.glyphs.reduce((s, g) => s + g.advance, 0)
+        expect(endX).toBeLessThanOrEqual(contentRight + 0.05)
+      }
+    }
+
+    // Last line has dotted leader under remaining width to contentRight
+    const lastLine = layout.lines[layout.lines.length - 1]!
+    const lastTextEndX = Math.max(
+      ...lastLine.runs.map((r) => r.x + r.glyphs.reduce((s, g) => s + g.advance, 0)),
+    )
+    const lastLeader = lastLine.shapes.find((s) => s.kind === 'line' && s.dash !== undefined)
+    expect(lastLeader).toBeDefined()
+    if (lastLeader && lastLeader.kind === 'line') {
+      expect(lastLeader.x1).toBeCloseTo(lastTextEndX, 2)
+      expect(lastLeader.x2).toBeCloseTo(contentRight, 2)
+    }
+
+    // Unbreakable single token inside fill emits FORCED_BREAK and stays within contentRight
+    const longToken = 'https://example.go.th/' + 'a'.repeat(120)
+    const { layout: forcedLayout, warnings: forcedWarnings } = await layoutParagraph(
+      {
+        type: 'paragraph',
+        runs: [
+          { text: 'เรื่อง  ' },
+          { fill: longToken, width: 'toEnd', leader: 'dots' },
+        ],
+      },
+      {
+        fonts,
+        base: baseFont,
+        dictionary: [],
+        contentLeft: 85.0394,
+        contentWidth: 453.5433,
+        anchors: createAnchorTable(),
+        path: 'blocks[5]',
+      },
+    )
+    expect(forcedWarnings).toEqual([
+      expect.objectContaining({ code: 'FORCED_BREAK', path: 'blocks[5]' }),
+    ])
+    for (const line of forcedLayout.lines) {
+      for (const run of line.runs) {
+        const endX = run.x + run.glyphs.reduce((s, g) => s + g.advance, 0)
+        expect(endX).toBeLessThanOrEqual(contentRight + 0.05)
+      }
+    }
+  })
 })
