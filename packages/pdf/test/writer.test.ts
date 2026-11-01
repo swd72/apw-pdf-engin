@@ -297,4 +297,61 @@ describe('writePdf and createPdfEngine', () => {
     expect(bytes.byteLength).toBeGreaterThan(100)
     expect(loadCalls).toEqual(['real-logo.png', 'real-sig.jpg'])
   })
+
+  it('round-trips tall consonant + sara am (ปำ ฝำ ฟำ ป้ำ) followed by ปิ้ via /ActualText without ToUnicode corruption (M1, M2)', async () => {
+    const { lookupCmapGlyphId, writePdf, createSubsetter } = await import('../src/index.js')
+    const engine = await getEngine()
+    const sourceText = 'ปำ ฝำ ฟำ ป้ำ น้ำ คำ ปิ้ ปี่ ฟื้น มา'
+    const doc = {
+      ...BASE_DOC,
+      blocks: [{ type: 'paragraph' as const, text: sourceText }],
+    }
+    const { bytes } = await engine.renderPdf(doc, {})
+
+    const pdf = await pdfjsLib.getDocument({
+      data: new Uint8Array(bytes),
+      isEvalSupported: false,
+    }).promise
+    const page = await pdf.getPage(1)
+    const content = await page.getTextContent()
+    const extracted = content.items
+      .map((item) => ('str' in item ? item.str : ''))
+      .join('')
+      .replace(/\s+/g, '')
+    expect(extracted).toBe(sourceText.replace(/\s+/g, ''))
+
+    // Verify lookupCmapGlyphId finds U+0E33 in THSarabunIT9 and returns null on empty/missing cmap
+    const font = await engine.fonts.get('THSarabunIT9', false, false)
+    expect(lookupCmapGlyphId(font.bytes, 0x0e33)).toBe(264)
+    expect(lookupCmapGlyphId(font.bytes, 0x1f600)).toBeNull()
+    expect(lookupCmapGlyphId(new Uint8Array(4), 0x0e33)).toBeNull()
+
+    // Verify /ActualText BDC/EMC span is emitted when cluster glyph count != codepoint count
+    const tree = await engine.layout(
+      {
+        ...BASE_DOC,
+        blocks: [{ type: 'paragraph' as const, text: 'ก' }],
+      },
+      {},
+    )
+    const glyphItem = tree.pages[0]!.items.find((i) => i.kind === 'glyphs')!
+    if (glyphItem.kind === 'glyphs') {
+      // Simulate a 2-glyph 1-codepoint cluster ('ก')
+      glyphItem.glyphs = [
+        { id: 179, dx: 0, dy: 0, advance: 5 },
+        { id: 286, dx: 0, dy: 0, advance: 0 },
+      ]
+      glyphItem.clusters = [0, 0]
+      glyphItem.text = 'ก'
+    }
+    const wasmPath = require.resolve('harfbuzzjs/dist/harfbuzz-subset.wasm')
+    const wasmBuf = await fs.readFile(wasmPath)
+    const subset = await createSubsetter(
+      new Uint8Array(wasmBuf.buffer, wasmBuf.byteOffset, wasmBuf.byteLength),
+    )
+    const spanBytes = await writePdf(tree, { fonts: engine.fonts, subset })
+    const rawPdf = new TextDecoder('latin1').decode(spanBytes)
+    expect(rawPdf).toContain('/Span << /ActualText <FEFF0E01> >> BDC')
+    expect(rawPdf).toContain('EMC')
+  })
 })

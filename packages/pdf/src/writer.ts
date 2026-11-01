@@ -50,33 +50,141 @@ interface NormalizedGlyph {
   dx: number
   dy: number
   advance: number
+  actualTextStart?: string
+  actualTextEnd?: boolean
 }
 
 interface SaraAmInfo {
-  nikhahitGid: number
+  nikhahitGids: Set<number>
   saraAaGid: number
   saraAmGid: number
 }
 
+export function lookupCmapGlyphId(bytes: Uint8Array, codePoint: number): number | null {
+  if (bytes.byteLength < 12) return null
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const numTables = view.getUint16(4, false)
+  let cmapOffset = 0
+  let cmapLength = 0
+
+  for (let i = 0; i < numTables; i++) {
+    const entryOffset = 12 + i * 16
+    if (entryOffset + 16 > bytes.byteLength) break
+    const tag = String.fromCharCode(
+      bytes[entryOffset]!,
+      bytes[entryOffset + 1]!,
+      bytes[entryOffset + 2]!,
+      bytes[entryOffset + 3]!,
+    )
+    if (tag === 'cmap') {
+      cmapOffset = view.getUint32(entryOffset + 8, false)
+      cmapLength = view.getUint32(entryOffset + 12, false)
+      break
+    }
+  }
+
+  if (!cmapOffset || cmapOffset + 4 > bytes.byteLength || cmapLength < 4) {
+    return null
+  }
+
+  const numSubtables = view.getUint16(cmapOffset + 2, false)
+  for (let s = 0; s < numSubtables; s++) {
+    const recOffset = cmapOffset + 4 + s * 8
+    if (recOffset + 8 > bytes.byteLength) break
+    const platformId = view.getUint16(recOffset, false)
+    const encodingId = view.getUint16(recOffset + 2, false)
+    const subRelOffset = view.getUint32(recOffset + 4, false)
+    const isUnicode =
+      platformId === 0 || (platformId === 3 && (encodingId === 1 || encodingId === 10))
+    if (!isUnicode) continue
+
+    const subOffset = cmapOffset + subRelOffset
+    if (subOffset + 2 > bytes.byteLength) continue
+    const format = view.getUint16(subOffset, false)
+
+    if (format === 4 && codePoint <= 0xffff && subOffset + 14 <= bytes.byteLength) {
+      const segCount = view.getUint16(subOffset + 6, false) >> 1
+      const endCodesOffset = subOffset + 14
+      const startCodesOffset = endCodesOffset + segCount * 2 + 2
+      const idDeltaOffset = startCodesOffset + segCount * 2
+      const idRangeOffsetPos = idDeltaOffset + segCount * 2
+      if (idRangeOffsetPos + segCount * 2 > bytes.byteLength) continue
+
+      for (let seg = 0; seg < segCount; seg++) {
+        const endCode = view.getUint16(endCodesOffset + seg * 2, false)
+        if (codePoint > endCode) continue
+        const startCode = view.getUint16(startCodesOffset + seg * 2, false)
+        if (codePoint < startCode) break
+        const idDelta = view.getInt16(idDeltaOffset + seg * 2, false)
+        const idRangeOffset = view.getUint16(idRangeOffsetPos + seg * 2, false)
+        if (idRangeOffset === 0) {
+          const gid = (codePoint + idDelta) & 0xffff
+          return gid > 0 ? gid : null
+        }
+        const glyphIndexAddr =
+          idRangeOffsetPos + seg * 2 + idRangeOffset + (codePoint - startCode) * 2
+        if (glyphIndexAddr + 2 > bytes.byteLength) return null
+        const rawGid = view.getUint16(glyphIndexAddr, false)
+        if (rawGid === 0) return null
+        const gid = (rawGid + idDelta) & 0xffff
+        return gid > 0 ? gid : null
+      }
+    } else if (format === 12 && subOffset + 16 <= bytes.byteLength) {
+      const numGroups = view.getUint32(subOffset + 12, false)
+      for (let g = 0; g < numGroups; g++) {
+        const grpOffset = subOffset + 16 + g * 12
+        if (grpOffset + 12 > bytes.byteLength) break
+        const startChar = view.getUint32(grpOffset, false)
+        const endChar = view.getUint32(grpOffset + 4, false)
+        if (codePoint >= startChar && codePoint <= endChar) {
+          const startGid = view.getUint32(grpOffset + 8, false)
+          const gid = startGid + (codePoint - startChar)
+          return gid > 0 ? gid : null
+        }
+      }
+    }
+  }
+
+  return null
+}
+
 function getSaraAmInfo(font: LoadedFont): SaraAmInfo | null {
+  const saraAmGid = lookupCmapGlyphId(font.bytes, 0x0e33)
+  if (!saraAmGid) return null
   const shaped = font.shape('\u0E33', 16)
   if (shaped.glyphs.length === 2) {
-    const nikhahitGid = shaped.glyphs[0]!.id
+    const nikhahitGids = new Set<number>([shaped.glyphs[0]!.id])
     const saraAaGid = shaped.glyphs[1]!.id
+    const tallShaped = font.shape('\u0E1B\u0E33', 16)
+    for (const g of tallShaped.glyphs) {
+      if (Math.abs(g.advance) < 1e-4 && g.id !== saraAaGid) {
+        nikhahitGids.add(g.id)
+      }
+    }
     return {
-      nikhahitGid,
+      nikhahitGids,
       saraAaGid,
-      saraAmGid: saraAaGid + 1,
+      saraAmGid,
     }
   }
   return null
+}
+
+function toUtf16BeHexWithBom(s: string): string {
+  let out = 'FEFF'
+  for (let i = 0; i < s.length; i++) {
+    out += (s.charCodeAt(i) & 0xffff).toString(16).toUpperCase().padStart(4, '0')
+  }
+  return out
 }
 
 /**
  * Normalizes a glyph run for PDF output and records GID -> Unicode mappings.
  * Collapses HarfBuzz's decomposed unshifted sara am (nikhahit + sara aa) into
  * the font's precomposed uni0E33 glyph so `/ToUnicode` round-trips U+0E33 ('ำ')
- * without colliding with U+0E32 ('า').
+ * without colliding with U+0E32 ('า'). For clusters whose glyph count differs
+ * from codepoint count (such as tall consonant + sara am), wraps the cluster
+ * in a PDF `/ActualText` span and avoids polluting 1-to-1 `/ToUnicode` entries.
  */
 function normalizeRunAndRecordUsage(
   item: Extract<LayoutItem, { kind: 'glyphs' }>,
@@ -95,7 +203,7 @@ function normalizeRunAndRecordUsage(
     const cEnd = j < glyphs.length ? (clusters[j] ?? text.length) : text.length
     const clusterText = text.slice(cStart, cEnd)
     const codePoints = Array.from(clusterText)
-    let clusterGlyphs: NormalizedGlyph[] = glyphs.slice(i, j).map((g) => ({
+    const clusterGlyphs: NormalizedGlyph[] = glyphs.slice(i, j).map((g) => ({
       id: g.id,
       dx: g.dx,
       dy: g.dy,
@@ -110,7 +218,7 @@ function normalizeRunAndRecordUsage(
     ) {
       const nikIdx = clusterGlyphs.findIndex(
         (g) =>
-          g.id === saraAm.nikhahitGid &&
+          saraAm.nikhahitGids.has(g.id) &&
           Math.abs(g.advance) < 1e-4 &&
           Math.abs(g.dx) < 1e-4 &&
           Math.abs(g.dy) < 1e-4,
@@ -124,30 +232,23 @@ function normalizeRunAndRecordUsage(
       }
     }
 
-    if (clusterGlyphs.length === 1 && codePoints.length >= 1) {
-      const gid = clusterGlyphs[0]!.id
-      if (gid !== 0 && !usage.has(gid)) {
-        usage.set(gid, clusterText)
-      }
-    } else if (clusterGlyphs.length === codePoints.length) {
+    if (clusterGlyphs.length === codePoints.length) {
       for (let k = 0; k < clusterGlyphs.length; k++) {
         const gid = clusterGlyphs[k]!.id
         const ch = codePoints[k]!
-        if (gid !== 0 && !usage.has(gid)) {
+        if (gid !== 0 && !usage.get(gid)) {
           usage.set(gid, ch)
         }
       }
-    } else {
-      for (let k = 0; k < clusterGlyphs.length; k++) {
-        const gid = clusterGlyphs[k]!.id
-        if (gid === 0 || usage.has(gid)) continue
-        if (k < codePoints.length - 1) {
-          usage.set(gid, codePoints[k]!)
-        } else if (k === clusterGlyphs.length - 1 && k < codePoints.length) {
-          usage.set(gid, codePoints.slice(k).join(''))
-        } else if (k < codePoints.length) {
-          usage.set(gid, codePoints[k]!)
+    } else if (clusterGlyphs.length > 0) {
+      for (const cg of clusterGlyphs) {
+        if (cg.id !== 0 && !usage.has(cg.id)) {
+          usage.set(cg.id, '')
         }
+      }
+      if (clusterText.length > 0) {
+        clusterGlyphs[0]!.actualTextStart = clusterText
+        clusterGlyphs[clusterGlyphs.length - 1]!.actualTextEnd = true
       }
     }
 
@@ -304,6 +405,11 @@ export async function writePdf(
         let idx = 0
         while (idx < glyphs.length) {
           const gl = glyphs[idx]!
+          if (gl.actualTextStart !== undefined) {
+            ops.push(
+              `/Span << /ActualText <${toUtf16BeHexWithBom(gl.actualTextStart)}> >> BDC`,
+            )
+          }
           const hasOffset = Math.abs(gl.dx) > 1e-4 || Math.abs(gl.dy) > 1e-4
           if (hasOffset) {
             const gx = cursorX + gl.dx
@@ -315,6 +421,9 @@ export async function writePdf(
             lineOriginX = gx
             lineOriginY = gy
             cursorX += gl.advance
+            if (gl.actualTextEnd) {
+              ops.push('EMC')
+            }
             idx++
           } else {
             const groupStartX = cursorX
@@ -329,10 +438,12 @@ export async function writePdf(
               lineOriginY = baseY
             }
             const tjParts: string[] = []
+            let closeActualText = false
             while (
               idx < glyphs.length &&
               Math.abs(glyphs[idx]!.dx) <= 1e-4 &&
-              Math.abs(glyphs[idx]!.dy) <= 1e-4
+              Math.abs(glyphs[idx]!.dy) <= 1e-4 &&
+              (tjParts.length === 0 || glyphs[idx]!.actualTextStart === undefined)
             ) {
               const cg = glyphs[idx]!
               const hex = cg.id.toString(16).toUpperCase().padStart(4, '0')
@@ -344,8 +455,15 @@ export async function writePdf(
               }
               cursorX += cg.advance
               idx++
+              if (cg.actualTextEnd) {
+                closeActualText = true
+                break
+              }
             }
             ops.push(`[${tjParts.join(' ')}] TJ`)
+            if (closeActualText) {
+              ops.push('EMC')
+            }
           }
         }
 
