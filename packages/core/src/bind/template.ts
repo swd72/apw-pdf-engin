@@ -44,13 +44,13 @@ function parseFilterSpec(
   const colonIdx = spec.indexOf(':')
   if (colonIdx === -1) {
     const name = spec.trim()
-    if (!name || !(name in FILTERS)) {
+    if (!name || !Object.hasOwn(FILTERS, name)) {
       throw new ApwPdfError('EXPRESSION_INVALID', `Unknown filter "${name}"`, { path })
     }
     return { name, args: [] }
   }
   const name = spec.slice(0, colonIdx).trim()
-  if (!name || !(name in FILTERS)) {
+  if (!name || !Object.hasOwn(FILTERS, name)) {
     throw new ApwPdfError('EXPRESSION_INVALID', `Unknown filter "${name}"`, { path })
   }
   const argRaw = spec.slice(colonIdx + 1).trim()

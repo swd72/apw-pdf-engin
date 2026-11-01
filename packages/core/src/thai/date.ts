@@ -56,7 +56,19 @@ function parseDateParts(value: Date | string): { year: number; month: number; da
       return { year, month, day }
     }
 
-    if (/^\d{4}-\d{2}-\d{2}T/.test(trimmed)) {
+    const isoDateTimeMatch = /^(\d{4})-(\d{2})-(\d{2})T/.exec(trimmed)
+    if (isoDateTimeMatch) {
+      const yPart = Number(isoDateTimeMatch[1])
+      const mPart = Number(isoDateTimeMatch[2]) - 1
+      const dPart = Number(isoDateTimeMatch[3])
+      const calCheck = new Date(yPart, mPart, dPart)
+      if (
+        calCheck.getFullYear() !== yPart ||
+        calCheck.getMonth() !== mPart ||
+        calCheck.getDate() !== dPart
+      ) {
+        throw new ApwPdfError('INVALID_VALUE', `Invalid date string: "${value}"`)
+      }
       const d = new Date(trimmed)
       if (Number.isNaN(d.getTime())) {
         throw new ApwPdfError('INVALID_VALUE', `Invalid date string: "${value}"`)

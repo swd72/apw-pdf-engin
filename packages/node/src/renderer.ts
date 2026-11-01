@@ -39,7 +39,7 @@ export interface Renderer {
 
 function resolveDocInput(doc: unknown): unknown {
   if (typeof doc === 'string') {
-    const tpl = templates[doc]
+    const tpl = Object.hasOwn(templates, doc) ? templates[doc] : undefined
     if (!tpl) {
       throw new ApwPdfError('SCHEMA_INVALID', `Unknown template "${doc}"`)
     }

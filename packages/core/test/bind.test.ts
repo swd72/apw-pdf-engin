@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { parseExpression, evaluate } from '../src/bind/expr.js'
 import { renderString } from '../src/bind/template.js'
 import { bindDocument } from '../src/bind/bind.js'
-import type { DocumentDef } from '../src/schema.js'
+import { parseDocument, type DocumentDef } from '../src/schema.js'
 
 const baseDoc: DocumentDef = {
   version: 1,
@@ -245,6 +245,50 @@ describe('expressions, filters, and binding', () => {
     // 2,000,000 Thai chars is 2M UTF-16 code units (< 5M) but 6,000,000 bytes in UTF-8 (> 5 MB)
     const twoMillionThai = 'ก'.repeat(2_000_000)
     expect(() => bindDocument(baseDoc, { v: twoMillionThai })).toThrow(
+      expect.objectContaining({ code: 'LIMIT_EXCEEDED' }),
+    )
+  })
+
+  it('rejects Object.prototype filter names, non-existent ISO datetime calendar dates, reserved each.as identifiers, and deep block nesting > 32 (LOW)', () => {
+    // 1. Object.prototype filter name (template.ts:47)
+    expect(() =>
+      renderString('{{x | toString}}', { x: 'hi' }, { strict: true, path: 'p' }),
+    ).toThrow(expect.objectContaining({ code: 'EXPRESSION_INVALID' }))
+
+    // 2. Non-existent ISO datetime calendar date (date.ts:59)
+    expect(() =>
+      renderString(
+        '{{d | thaiDate:"long"}}',
+        { d: '2026-02-31T00:00:00Z' },
+        { strict: true, path: 'p' },
+      ),
+    ).toThrow(expect.objectContaining({ code: 'INVALID_VALUE' }))
+
+    // 3. Reserved each.as identifier (__proto__ / constructor)
+    expect(() =>
+      parseDocument({
+        ...baseDoc,
+        blocks: [
+          {
+            type: 'each',
+            of: 'items',
+            as: '__proto__',
+            blocks: [{ type: 'paragraph', text: 'x' }],
+          },
+        ],
+      }),
+    ).toThrow(expect.objectContaining({ code: 'SCHEMA_INVALID' }))
+
+    // 4. Deep block nesting > 32
+    let nestedBlock: any = { type: 'paragraph', text: 'leaf' }
+    for (let i = 0; i < 35; i++) {
+      nestedBlock = { type: 'if', test: 'ok', then: [nestedBlock] }
+    }
+    const deepDoc = parseDocument({
+      ...baseDoc,
+      blocks: [nestedBlock],
+    })
+    expect(() => bindDocument(deepDoc, { ok: true })).toThrow(
       expect.objectContaining({ code: 'LIMIT_EXCEEDED' }),
     )
   })

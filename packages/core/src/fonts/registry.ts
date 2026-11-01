@@ -28,12 +28,15 @@ export interface LoadedFont {
   glyphAdvance(glyphId: number): number
 }
 
+const MAX_SHAPE_CACHE = 4096
+
 export class FontRegistry {
   private provider: FontProvider
   private byKey = new Map<string, Promise<LoadedFont>>()
   private byIdMap = new Map<number, LoadedFont>()
   private nextId = 1
   private shapeCache = new Map<string, ShapedRun>()
+  public fallbackWarnings: Warning[] = []
   public warnings: Warning[] = []
 
   private constructor(provider: FontProvider) {
@@ -88,10 +91,12 @@ export class FontRegistry {
       for (const cand of candidates) {
         try {
           const fallbackFont = await this.get(family, cand.bold, cand.italic)
-          this.warnings.push({
+          const warning: Warning = {
             code: 'FONT_STYLE_FALLBACK',
             message: `Font style fallback for ${family} (requested bold=${String(bold)}, italic=${String(italic)}; using bold=${String(cand.bold)}, italic=${String(cand.italic)})`,
-          })
+          }
+          this.fallbackWarnings.push(warning)
+          this.warnings.push(warning)
           return fallbackFont
         } catch {
           // continue trying next candidate
@@ -173,6 +178,12 @@ export class FontRegistry {
         }
 
         const run: ShapedRun = { glyphs, width, missing }
+        if (this.shapeCache.size >= MAX_SHAPE_CACHE) {
+          const oldest = this.shapeCache.keys().next().value
+          if (oldest !== undefined) {
+            this.shapeCache.delete(oldest)
+          }
+        }
         this.shapeCache.set(cacheKey, run)
         return run
       },

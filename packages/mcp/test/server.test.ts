@@ -225,6 +225,9 @@ describe('@apw-pdf/mcp server and tools', () => {
       'PATH_NOT_ALLOWED',
     )
     expect(() => validatePdfFileName('../x.pdf')).toThrow('PATH_NOT_ALLOWED')
+    expect(() => validatePdfFileName('CON.pdf')).toThrow('PATH_NOT_ALLOWED')
+    expect(() => validatePdfFileName('nul.pdf')).toThrow('PATH_NOT_ALLOWED')
+    expect(() => resolveInside('/tmp/out', 'COM1.pdf')).toThrow('PATH_NOT_ALLOWED')
     expect(() => validatePdfFileName('บันทึก-01.pdf')).not.toThrow()
 
     expect(getSchemaGuide('blocks')).toContain('paragraph')

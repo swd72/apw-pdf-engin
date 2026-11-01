@@ -1,4 +1,4 @@
-import type { DocumentDef, TemplateDef } from '@apw-pdf/core'
+import { ApwPdfError, type DocumentDef, type TemplateDef } from '@apw-pdf/core'
 
 export const GOV_PAGE: DocumentDef['page'] = {
   size: 'A4',
@@ -33,5 +33,16 @@ export type BuiltTemplate<T> = TemplateDef & {
 }
 
 export function defineTemplate<T>(def: BuiltTemplate<T>): BuiltTemplate<T> {
-  return def
+  return {
+    ...def,
+    build(input: T) {
+      if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+        throw new ApwPdfError(
+          'SCHEMA_INVALID',
+          'Template input data must be a plain object',
+        )
+      }
+      return def.build(input)
+    },
+  }
 }

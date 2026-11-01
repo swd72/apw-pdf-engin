@@ -39,6 +39,7 @@ export function usePdf(
 
   useEffect(() => {
     return () => {
+      reqSeqRef.current += 1
       if (currentUrlRef.current) {
         URL.revokeObjectURL(currentUrlRef.current)
         currentUrlRef.current = undefined

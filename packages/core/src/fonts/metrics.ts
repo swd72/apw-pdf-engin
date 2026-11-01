@@ -1,3 +1,4 @@
+import { ApwPdfError } from '../errors.js'
 import type { LineSpacing } from '../schema.js'
 import { toPt } from '../units.js'
 
@@ -23,6 +24,15 @@ export function readFontMetrics(
   hhea: Uint8Array,
   upem: number,
 ): FontMetrics {
+  if (
+    (os2.byteLength > 0 && os2.byteLength < 78) ||
+    (hhea.byteLength > 0 && hhea.byteLength < 10)
+  ) {
+    throw new ApwPdfError(
+      'FONT_INVALID',
+      'Truncated OpenType OS/2 or hhea metric table',
+    )
+  }
   const os2View = new DataView(os2.buffer, os2.byteOffset, os2.byteLength)
   const hheaView = new DataView(hhea.buffer, hhea.byteOffset, hhea.byteLength)
 

@@ -116,4 +116,48 @@ describe('font registry, metrics, and shaping', () => {
       expect.objectContaining({ code: 'FONT_NOT_FOUND' }),
     )
   })
+
+  it('rejects truncated OS/2 or hhea metric tables with FONT_INVALID and preserves fallbackWarnings (LOW)', async () => {
+    const { readFontMetrics } = await import('../src/fonts/metrics.js')
+    expect(() =>
+      readFontMetrics(new Uint8Array(10), new Uint8Array(36), 1000),
+    ).toThrow(expect.objectContaining({ code: 'FONT_INVALID' }))
+    expect(() =>
+      readFontMetrics(new Uint8Array(80), new Uint8Array(4), 1000),
+    ).toThrow(expect.objectContaining({ code: 'FONT_INVALID' }))
+
+    const base = testFontProvider()
+    const fallbackProvider: FontProvider = {
+      async load(family, style) {
+        if (style.italic) {
+          throw new ApwPdfError('FONT_NOT_FOUND', 'No italic')
+        }
+        return base.load(family, style)
+      },
+    }
+    const { createEngine } = await import('../src/engine.js')
+    const engine = await createEngine({ fonts: fallbackProvider })
+    const doc = {
+      version: 1,
+      page: {
+        size: 'A4',
+        margin: { top: '1.5cm', bottom: '2cm', left: '3cm', right: '2cm' },
+      },
+      font: { family: 'THSarabunIT9', size: '16pt' },
+      blocks: [
+        {
+          type: 'paragraph',
+          runs: [{ text: 'เอียง', italic: true }],
+        },
+      ],
+    }
+    const tree1 = await engine.layout(doc, {})
+    const tree2 = await engine.layout(doc, {})
+    expect(tree1.warnings).toEqual([
+      expect.objectContaining({ code: 'FONT_STYLE_FALLBACK' }),
+    ])
+    expect(tree2.warnings).toEqual([
+      expect.objectContaining({ code: 'FONT_STYLE_FALLBACK' }),
+    ])
+  })
 })

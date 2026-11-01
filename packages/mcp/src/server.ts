@@ -91,9 +91,11 @@ export async function createServer(opts: ServerOptions): Promise<McpServer> {
         { path: 'templateName' },
       )
     }
-    const builtin = (builtinTemplates as Record<string, TemplateDef | undefined>)[
-      templateName
-    ]
+    const builtin = Object.hasOwn(builtinTemplates, templateName)
+      ? (builtinTemplates as Record<string, TemplateDef | undefined>)[
+          templateName
+        ]
+      : undefined
     if (builtin) {
       return builtin.document
     }
@@ -193,9 +195,9 @@ export async function createServer(opts: ServerOptions): Promise<McpServer> {
     },
     async ({ name }) => {
       try {
-        const builtin = (
-          builtinTemplates as Record<string, TemplateDef | undefined>
-        )[name]
+        const builtin = Object.hasOwn(builtinTemplates, name)
+          ? (builtinTemplates as Record<string, TemplateDef | undefined>)[name]
+          : undefined
         if (builtin) {
           return {
             content: [
@@ -449,9 +451,9 @@ export async function createServer(opts: ServerOptions): Promise<McpServer> {
     },
     async (uri, variables) => {
       const name = String(variables.name ?? '')
-      const builtin = (
-        builtinTemplates as Record<string, TemplateDef | undefined>
-      )[name]
+      const builtin = Object.hasOwn(builtinTemplates, name)
+        ? (builtinTemplates as Record<string, TemplateDef | undefined>)[name]
+        : undefined
       if (builtin) {
         return {
           contents: [

@@ -13,16 +13,21 @@ export class PathNotAllowedError extends Error {
 
 const PDF_FILENAME_RE = /^[\w\-ก-๙. ]{1,100}\.pdf$/
 const TEMPLATE_NAME_RE = /^[a-z0-9-]{1,64}$/
+const WINDOWS_RESERVED_RE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i
 
 export function validatePdfFileName(fileName: string): string {
-  if (!PDF_FILENAME_RE.test(fileName) || fileName.includes('..')) {
+  if (
+    !PDF_FILENAME_RE.test(fileName) ||
+    fileName.includes('..') ||
+    WINDOWS_RESERVED_RE.test(fileName)
+  ) {
     throw new PathNotAllowedError('PATH_NOT_ALLOWED', fileName)
   }
   return fileName
 }
 
 export function validateTemplateName(name: string): string {
-  if (!TEMPLATE_NAME_RE.test(name)) {
+  if (!TEMPLATE_NAME_RE.test(name) || WINDOWS_RESERVED_RE.test(name)) {
     throw new PathNotAllowedError('PATH_NOT_ALLOWED', name)
   }
   return name
@@ -35,7 +40,8 @@ export function resolveInside(root: string, name: string): string {
     name.startsWith('/') ||
     name.startsWith('\\') ||
     /^[a-zA-Z]:/.test(name) ||
-    name.includes('..')
+    name.includes('..') ||
+    WINDOWS_RESERVED_RE.test(path.basename(name))
   ) {
     throw new PathNotAllowedError('PATH_NOT_ALLOWED', name)
   }

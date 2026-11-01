@@ -78,7 +78,7 @@ export async function createEngine(opts: {
       })
       const box = pageBox(resolvedDoc.page)
 
-      fonts.warnings = []
+      fonts.warnings = [...fonts.fallbackWarnings]
       const baseLoadedFont = await fonts.get(resolvedDoc.font.family, false, false)
 
       const pnCfg = resolvedDoc.pageNumber

@@ -400,6 +400,9 @@ export async function layoutBlockToFragment(
         })
       }
       const fragment = await handler(block, ctx, x, width, path)
+      if (block.type === 'table' && fragment.height === 0) {
+        return {}
+      }
       return { fragment }
     }
   }

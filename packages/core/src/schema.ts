@@ -425,11 +425,19 @@ const cellSchema: z.ZodType<Cell> = z.lazy(() =>
   }),
 )
 
+const safeIdentifierSchema = z
+  .string()
+  .regex(/^[a-zA-Z_$][a-zA-Z0-9_$]*$/, 'Invalid loop variable identifier')
+  .refine(
+    (v) => v !== '__proto__' && v !== 'constructor' && v !== 'prototype',
+    'Reserved identifier is not allowed',
+  )
+
 const tableRowsSchema = z.union([
   z.array(z.array(cellSchema)),
   z.object({
     each: z.string().min(1),
-    as: z.string().min(1),
+    as: safeIdentifierSchema,
     cells: z.array(cellSchema),
   }),
 ])
@@ -501,7 +509,7 @@ const pageBreakBlockSchema = z.object({
 const eachBlockSchema = z.object({
   type: z.literal('each'),
   of: z.string().min(1),
-  as: z.string().min(1),
+  as: safeIdentifierSchema,
   blocks: z.lazy(() => z.array(blockSchema)),
 })
 

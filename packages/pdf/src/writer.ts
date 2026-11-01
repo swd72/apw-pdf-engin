@@ -385,7 +385,7 @@ export async function writePdf(
 
     for (const item of layoutPage.items) {
       if (item.kind === 'glyphs') {
-        const glyphs = normalizedRuns.get(item) ?? item.glyphs
+        const glyphs: NormalizedGlyph[] = normalizedRuns.get(item) ?? item.glyphs
         if (glyphs.length === 0) continue
 
         const loadedFont = opts.fonts.byId(item.font)
@@ -448,7 +448,10 @@ export async function writePdf(
               const cg = glyphs[idx]!
               const hex = cg.id.toString(16).toUpperCase().padStart(4, '0')
               tjParts.push(`<${hex}>`)
-              const fontAdvPt = (loadedFont.glyphAdvance(cg.id) / upem) * item.size
+              const wThousandths = Math.round(
+                (loadedFont.glyphAdvance(cg.id) / upem) * 1000,
+              )
+              const fontAdvPt = (wThousandths / 1000) * item.size
               const kern = -((cg.advance - fontAdvPt) * 1000) / item.size
               if (Math.abs(kern) > 0.01) {
                 tjParts.push(fmt(kern))

@@ -201,4 +201,51 @@ describe('usePdf hook', () => {
       path: 'blocks[0].text',
     })
   })
+
+  it('does not leak blob URL when unmounted while render is in flight (LOW)', async () => {
+    let resolveRender!: (res: RenderResponse) => void
+    const client: RenderClient = {
+      render: vi.fn(
+        () =>
+          new Promise<RenderResponse>((resolve) => {
+            resolveRender = resolve
+          }),
+      ),
+      dispose: vi.fn(),
+    }
+
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <ApwPdfProvider fontBaseUrl="/fonts" wasmUrl="/hb.wasm" client={client}>
+        {children}
+      </ApwPdfProvider>
+    )
+
+    const stableDoc = { version: 1, blocks: [] }
+    const stableData = { a: 1 }
+    const { unmount } = renderHook(
+      () => usePdf(stableDoc, stableData, { debounceMs: 10 }),
+      { wrapper },
+    )
+
+    await act(async () => {
+      vi.advanceTimersByTime(10)
+    })
+    expect(client.render).toHaveBeenCalledTimes(1)
+
+    // Unmount while render is still in flight
+    unmount()
+
+    await act(async () => {
+      resolveRender({
+        id: 1,
+        ok: true,
+        bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46]),
+        pageCount: 1,
+        warnings: [],
+      })
+    })
+
+    // URL.createObjectURL should never have been called after unmount
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+  })
 })

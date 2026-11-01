@@ -188,6 +188,7 @@ export function bindDocument(
     cell: Cell,
     scope: Record<string, unknown>,
     path: string,
+    depth = 0,
   ): ResolvedCell {
     const { blocks, text, ...rest } = cell
     const out: ResolvedCell = { ...rest }
@@ -195,7 +196,7 @@ export function bindDocument(
       out.text = bindStr(text, scope, `${path}.text`)
     }
     if (blocks !== undefined) {
-      out.blocks = bindBlocks(blocks, scope, `${path}.blocks`)
+      out.blocks = bindBlocks(blocks, scope, `${path}.blocks`, depth + 1)
     }
     return out
   }
@@ -230,7 +231,15 @@ export function bindDocument(
     blocks: Block[],
     scope: Record<string, unknown>,
     basePath: string,
+    depth = 0,
   ): ResolvedBlock[] {
+    if (depth > 32) {
+      throw new ApwPdfError(
+        'LIMIT_EXCEEDED',
+        'Maximum block nesting depth (32) exceeded',
+        { path: basePath },
+      )
+    }
     const out: ResolvedBlock[] = []
 
     for (let i = 0; i < blocks.length; i++) {
@@ -254,7 +263,7 @@ export function bindDocument(
               [b.as]: arr[idx],
               $index: idx,
             }
-            out.push(...bindBlocks(b.blocks, childScope, `${path}.blocks`))
+            out.push(...bindBlocks(b.blocks, childScope, `${path}.blocks`, depth + 1))
           }
           break
         }
@@ -262,9 +271,9 @@ export function bindDocument(
           const expr = parseExpression(b.test, `${path}.test`)
           const cond = Boolean(evaluate(expr, scope))
           if (cond) {
-            out.push(...bindBlocks(b.then, scope, `${path}.then`))
+            out.push(...bindBlocks(b.then, scope, `${path}.then`, depth + 1))
           } else if (b.else) {
-            out.push(...bindBlocks(b.else, scope, `${path}.else`))
+            out.push(...bindBlocks(b.else, scope, `${path}.else`, depth + 1))
           }
           break
         }
@@ -289,15 +298,15 @@ export function bindDocument(
         }
         case 'table': {
           const header = b.header?.map((row, rIdx) =>
-            row.map((c, cIdx) => bindCell(c, scope, `${path}.header[${rIdx}][${cIdx}]`)),
+            row.map((c, cIdx) => bindCell(c, scope, `${path}.header[${rIdx}][${cIdx}]`, depth + 1)),
           )
           const footer = b.footer?.map((row, rIdx) =>
-            row.map((c, cIdx) => bindCell(c, scope, `${path}.footer[${rIdx}][${cIdx}]`)),
+            row.map((c, cIdx) => bindCell(c, scope, `${path}.footer[${rIdx}][${cIdx}]`, depth + 1)),
           )
           let rows: ResolvedCell[][]
           if (Array.isArray(b.rows)) {
             rows = b.rows.map((row, rIdx) =>
-              row.map((c, cIdx) => bindCell(c, scope, `${path}.rows[${rIdx}][${cIdx}]`)),
+              row.map((c, cIdx) => bindCell(c, scope, `${path}.rows[${rIdx}][${cIdx}]`, depth + 1)),
             )
           } else {
             const arr = resolveArray(b.rows.each, scope, `${path}.rows.each`)
@@ -318,7 +327,7 @@ export function bindDocument(
               }
               rows.push(
                 b.rows.cells.map((c, cIdx) =>
-                  bindCell(c, rowScope, `${path}.rows.cells[${cIdx}]`),
+                  bindCell(c, rowScope, `${path}.rows.cells[${cIdx}]`, depth + 1),
                 ),
               )
             }
@@ -337,7 +346,7 @@ export function bindDocument(
             columns: b.columns.map((col, cIdx) => ({
               width: col.width,
               ...(col.align ? { align: col.align } : {}),
-              blocks: bindBlocks(col.blocks, scope, `${path}.columns[${cIdx}].blocks`),
+              blocks: bindBlocks(col.blocks, scope, `${path}.columns[${cIdx}].blocks`, depth + 1),
             })),
           })
           break

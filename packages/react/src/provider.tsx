@@ -39,6 +39,21 @@ export function createRenderClient(opts: RenderClientOptions): RenderClient {
           resolve(res)
         }
       }
+      const handleWorkerError = () => {
+        for (const [reqId, resolve] of pending.entries()) {
+          resolve({
+            id: reqId,
+            ok: false,
+            error: {
+              code: 'WORKER_ERROR',
+              message: 'PDF render worker encountered an unexpected error',
+            },
+          })
+        }
+        pending.clear()
+      }
+      worker.onerror = handleWorkerError
+      worker.onmessageerror = handleWorkerError
     } catch {
       worker = null
     }
