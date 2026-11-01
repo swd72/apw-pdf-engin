@@ -222,4 +222,22 @@ describe('expressions, filters, and binding', () => {
       expect.objectContaining({ code: 'LIMIT_EXCEEDED' }),
     )
   })
+
+  it('converts Thai numerals in linear time without quadratic regex backtracking on 40k chars (S3)', () => {
+    const adversarial = 'ก1'.repeat(20_000) + ' user1@example.go.th https://a.go.th/123 99'
+    const start = performance.now()
+    const { doc: resolved } = bindDocument(
+      {
+        ...baseDoc,
+        numerals: 'thai',
+        blocks: [{ type: 'paragraph', text: '{{v}}' }],
+      },
+      { v: adversarial },
+    )
+    const elapsed = performance.now() - start
+    expect(elapsed).toBeLessThan(50)
+    const outText = (resolved.blocks[0] as { text: string }).text
+    expect(outText.endsWith(' user1@example.go.th https://a.go.th/123 ๙๙')).toBe(true)
+    expect(outText.startsWith('ก๑ก๑')).toBe(true)
+  })
 })

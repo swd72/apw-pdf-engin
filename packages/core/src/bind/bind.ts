@@ -76,18 +76,27 @@ export interface ResolvedDocument extends Omit<DocumentDef, 'blocks' | 'pageNumb
   blocks: ResolvedBlock[]
 }
 
-const EMAIL_OR_URL_RE = /\S+@\S+\.\S+|https?:\/\/\S+/g
+const ANCHORED_URL_RE = /^https?:\/\/\S{1,2048}$/i
+const ANCHORED_EMAIL_RE = /^[^@\s]{1,256}@[^@\s.]{1,256}(?:\.[^@\s.]{1,256})+$/
+
+function isEmailOrUrlToken(token: string): boolean {
+  if (token.length < 4 || token.length > 2048) return false
+  return ANCHORED_URL_RE.test(token) || ANCHORED_EMAIL_RE.test(token)
+}
 
 export function convertThaiNumeralsSelective(text: string): string {
+  const parts = text.split(/(\s+)/)
   let out = ''
-  let lastIdx = 0
-  for (const match of text.matchAll(EMAIL_OR_URL_RE)) {
-    const idx = match.index ?? 0
-    out += toThaiDigits(text.slice(lastIdx, idx))
-    out += match[0]
-    lastIdx = idx + match[0].length
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]!
+    if (i % 2 === 1 || part.length === 0) {
+      out += part
+    } else if (isEmailOrUrlToken(part)) {
+      out += part
+    } else {
+      out += toThaiDigits(part)
+    }
   }
-  out += toThaiDigits(text.slice(lastIdx))
   return out
 }
 
