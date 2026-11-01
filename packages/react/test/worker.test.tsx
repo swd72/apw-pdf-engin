@@ -61,6 +61,50 @@ describe('fetchFontProvider and worker handleMessage', () => {
     ).rejects.toMatchObject({ code: 'IMAGE_NOT_ALLOWED' })
   })
 
+  it('rejects protocol-relative and uppercase cross-origin URLs, enforces 10 MB cap, and passes timeout signal (M12)', async () => {
+    const provider = fetchImageProvider({})
+
+    await expect(
+      provider.load('//evil.example.com/x.png'),
+    ).rejects.toMatchObject({ code: 'IMAGE_NOT_ALLOWED' })
+
+    await expect(
+      provider.load('HTTPS://evil.example.com/x.png'),
+    ).rejects.toMatchObject({ code: 'IMAGE_NOT_ALLOWED' })
+
+    // Oversized data: URL (> 10 MB)
+    const bigBase64 = 'data:image/png;base64,' + 'A'.repeat(14 * 1024 * 1024)
+    await expect(provider.load(bigBase64)).rejects.toMatchObject({
+      code: 'LIMIT_EXCEEDED',
+    })
+
+    // Oversized fetched response via Content-Length header
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ 'content-length': String(10 * 1024 * 1024 + 1) }),
+      arrayBuffer: async () => new ArrayBuffer(8),
+    } as Response)
+
+    await expect(provider.load('/images/too-big-header.png')).rejects.toMatchObject({
+      code: 'LIMIT_EXCEEDED',
+    })
+    expect(fetchSpy).toHaveBeenCalledWith(
+      '/images/too-big-header.png',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    )
+
+    // Oversized fetched response via body byteLength
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers(),
+      arrayBuffer: async () => new ArrayBuffer(10 * 1024 * 1024 + 1),
+    } as Response)
+
+    await expect(provider.load('/images/too-big-body.png')).rejects.toMatchObject({
+      code: 'LIMIT_EXCEEDED',
+    })
+  })
+
   it('worker handleMessage(req) renders memo example, handles errors, and createRenderClient works', async () => {
     const wasmPath = require.resolve('harfbuzzjs/dist/harfbuzz-subset.wasm')
     const placeholderPath = require.resolve(

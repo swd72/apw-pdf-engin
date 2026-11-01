@@ -4,6 +4,7 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { memo } from '@apw-pdf/templates'
 import { createRenderer } from '../src/index.js'
+import { createApp } from '../../../examples/express-server/server.js'
 
 describe('createRenderer', () => {
   it('renders memo by template name and writes file via renderToFile', async () => {
@@ -55,4 +56,73 @@ describe('createRenderer', () => {
       expect(elapsed20).toBeLessThan(1500)
     },
   )
+
+  it('express server returns JSON 400 on malformed JSON, sanitizes 500 errors, and rate limits requests (M13)', async () => {
+    const app = await createApp({
+      maxRequestsPerWindow: 2,
+      windowMs: 60_000,
+      renderer: {
+        async render(tpl: string) {
+          if (tpl === 'memo') {
+            throw new Error('C:\\secret\\db-credentials.json crashed')
+          }
+          return new Uint8Array([0x25, 0x50, 0x44, 0x46])
+        },
+      },
+    } as Parameters<typeof createApp>[0])
+
+    const server = await new Promise<import('node:http').Server>((resolve) => {
+      const s = app.listen(0, '127.0.0.1', () => resolve(s))
+    })
+
+    try {
+      const addr = server.address() as { port: number }
+      const base = `http://127.0.0.1:${addr.port}`
+
+      // 1. Malformed JSON -> 400 JSON without stack trace
+      const badJsonRes = await fetch(`${base}/pdf/memo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{bad json',
+      })
+      expect(badJsonRes.status).toBe(400)
+      const badJsonBody = (await badJsonRes.json()) as {
+        code: string
+        message: string
+      }
+      expect(badJsonBody.code).toBe('INVALID_JSON')
+
+      // 2. Unexpected error -> generic 500 JSON without leaking internal message
+      const errRes = await fetch(`${base}/pdf/memo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })
+      expect(errRes.status).toBe(500)
+      const errBody = (await errRes.json()) as { code: string; message: string }
+      expect(errBody.code).toBe('INTERNAL_ERROR')
+      expect(errBody.message).toBe('Internal server error')
+      expect(errBody.message).not.toContain('secret')
+
+      // 3. Second POST succeeds (within maxRequestsPerWindow: 2)
+      const okRes = await fetch(`${base}/pdf/external-letter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })
+      expect(okRes.status).toBe(200)
+
+      // 4. Third POST exceeds rate limit -> 429
+      const rateRes = await fetch(`${base}/pdf/external-letter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })
+      expect(rateRes.status).toBe(429)
+      const rateBody = (await rateRes.json()) as { code: string }
+      expect(rateBody.code).toBe('RATE_LIMITED')
+    } finally {
+      server.close()
+    }
+  })
 })

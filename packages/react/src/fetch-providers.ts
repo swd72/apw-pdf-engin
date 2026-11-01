@@ -5,6 +5,8 @@ import {
 } from '@apw-pdf/core'
 import { fontFileName } from '@apw-pdf/fonts'
 
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
 function decodeDataUrlBrowser(dataUrl: string): Uint8Array {
   const commaIdx = dataUrl.indexOf(',')
   if (commaIdx === -1) {
@@ -12,15 +14,26 @@ function decodeDataUrlBrowser(dataUrl: string): Uint8Array {
   }
   const header = dataUrl.slice(5, commaIdx)
   const payload = dataUrl.slice(commaIdx + 1)
-  if (header.endsWith(';base64')) {
+  if (header.toLowerCase().endsWith(';base64')) {
+    const cleanLen = payload.replace(/\s+/g, '').length
+    if (Math.floor((cleanLen * 3) / 4) > MAX_IMAGE_BYTES) {
+      throw new ApwPdfError('LIMIT_EXCEEDED', 'Image exceeds 10 MB limit')
+    }
     const binStr = atob(payload)
+    if (binStr.length > MAX_IMAGE_BYTES) {
+      throw new ApwPdfError('LIMIT_EXCEEDED', 'Image exceeds 10 MB limit')
+    }
     const out = new Uint8Array(binStr.length)
     for (let i = 0; i < binStr.length; i++) {
       out[i] = binStr.charCodeAt(i)
     }
     return out
   }
-  return new TextEncoder().encode(decodeURIComponent(payload))
+  const out = new TextEncoder().encode(decodeURIComponent(payload))
+  if (out.byteLength > MAX_IMAGE_BYTES) {
+    throw new ApwPdfError('LIMIT_EXCEEDED', 'Image exceeds 10 MB limit')
+  }
+  return out
 }
 
 export function fetchFontProvider(baseUrl: string): FontProvider {
@@ -66,46 +79,76 @@ export function fetchImageProvider(
       let target = ref
       if (ref.startsWith('asset:')) {
         const name = ref.slice('asset:'.length)
-        const mapped = assetMap[name]
+        const mapped = Object.hasOwn(assetMap, name) ? assetMap[name] : undefined
         if (!mapped) {
           throw new ApwPdfError('IMAGE_LOAD_FAILED', `Unknown asset "${name}"`)
         }
         target = mapped
-      } else if (ref in assetMap) {
+      } else if (Object.hasOwn(assetMap, ref)) {
         target = assetMap[ref]!
       }
 
-      if (target.startsWith('data:')) {
+      if (/^data:/i.test(target)) {
         return decodeDataUrlBrowser(target)
       }
 
-      if (
-        (target.startsWith('http://') || target.startsWith('https://')) &&
+      const baseOrigin =
         typeof location !== 'undefined' &&
         location.origin &&
         location.origin !== 'null'
+          ? location.origin
+          : 'http://localhost'
+
+      let parsed: URL
+      try {
+        parsed = new URL(target, baseOrigin)
+      } catch {
+        throw new ApwPdfError(
+          'IMAGE_NOT_ALLOWED',
+          `Cross-origin image "${target}" is not allowed`,
+        )
+      }
+
+      if (
+        parsed.origin !== baseOrigin ||
+        (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
       ) {
-        const parsed = new URL(target, location.origin)
-        if (parsed.origin !== location.origin) {
-          throw new ApwPdfError(
-            'IMAGE_NOT_ALLOWED',
-            `Cross-origin image "${target}" is not allowed`,
-          )
-        }
+        throw new ApwPdfError(
+          'IMAGE_NOT_ALLOWED',
+          `Cross-origin image "${target}" is not allowed`,
+        )
       }
 
       const cached = cache.get(target)
       if (cached) return cached
 
       const promise = (async () => {
-        const res = await fetch(target)
+        const res = await fetch(target, {
+          signal: AbortSignal.timeout(10_000),
+        })
         if (!res.ok) {
           throw new ApwPdfError(
             'IMAGE_LOAD_FAILED',
             `Failed to fetch image "${target}" (HTTP ${res.status})`,
           )
         }
+        const contentLength = res.headers?.get?.('content-length')
+        if (contentLength !== null && contentLength !== undefined) {
+          const declaredLen = Number(contentLength)
+          if (Number.isFinite(declaredLen) && declaredLen > MAX_IMAGE_BYTES) {
+            throw new ApwPdfError(
+              'LIMIT_EXCEEDED',
+              `Remote image "${target}" exceeds 10 MB limit`,
+            )
+          }
+        }
         const ab = await res.arrayBuffer()
+        if (ab.byteLength > MAX_IMAGE_BYTES) {
+          throw new ApwPdfError(
+            'LIMIT_EXCEEDED',
+            `Remote image "${target}" exceeds 10 MB limit`,
+          )
+        }
         return new Uint8Array(ab)
       })()
 
