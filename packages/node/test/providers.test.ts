@@ -155,4 +155,65 @@ describe('fsFontProvider and fsImageProvider', () => {
       await new Promise<void>((resolve) => evilServer.close(() => resolve()))
     }
   })
+
+  it('prechecks Content-Length and aborts streaming response body at 10 MB without buffering everything (S2)', async () => {
+    let chunksSent = 0
+    const oneMb = Buffer.alloc(1024 * 1024, 0x41)
+    const server = http.createServer((req, res) => {
+      if (req.url === '/cl-oversize') {
+        res.writeHead(200, {
+          'Content-Type': 'image/png',
+          'Content-Length': String(25 * 1024 * 1024),
+        })
+        // Never even finish sending 25 MB; precheck should reject immediately on headers
+        res.write(Buffer.alloc(1024))
+        return
+      }
+      if (req.url === '/stream-oversize') {
+        res.writeHead(200, { 'Content-Type': 'image/png' })
+        const writeNext = () => {
+          if (res.destroyed || res.writableEnded) return
+          if (chunksSent >= 25) {
+            res.end()
+            return
+          }
+          chunksSent++
+          const ok = res.write(oneMb)
+          if (ok) {
+            setImmediate(writeNext)
+          } else {
+            res.once('drain', writeNext)
+          }
+        }
+        writeNext()
+      }
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()))
+    const addr = server.address()
+    const port = typeof addr === 'object' && addr ? addr.port : 0
+
+    try {
+      const provider = fsImageProvider({ allowRemoteImages: ['127.0.0.1'] })
+
+      // Content-Length > 10 MB rejects immediately with LIMIT_EXCEEDED (not timeout!)
+      const start = Date.now()
+      await expect(
+        provider.load(`http://127.0.0.1:${port}/cl-oversize`),
+      ).rejects.toMatchObject({
+        code: 'LIMIT_EXCEEDED',
+      })
+      expect(Date.now() - start).toBeLessThan(2000)
+
+      // Streaming response > 10 MB aborts early with LIMIT_EXCEEDED before all 25 chunks are sent
+      await expect(
+        provider.load(`http://127.0.0.1:${port}/stream-oversize`),
+      ).rejects.toMatchObject({
+        code: 'LIMIT_EXCEEDED',
+      })
+      expect(chunksSent).toBeLessThan(20)
+    } finally {
+      server.closeAllConnections?.()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  })
 })

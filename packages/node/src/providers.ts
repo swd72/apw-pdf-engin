@@ -183,14 +183,61 @@ export function fsImageProvider(
             `HTTP ${res?.status ?? 0} when fetching image "${ref}"`,
           )
         }
-        const ab = await res.arrayBuffer()
-        if (ab.byteLength > MAX_IMAGE_BYTES) {
-          throw new ApwPdfError(
-            'LIMIT_EXCEEDED',
-            `Remote image "${ref}" exceeds 10 MB limit`,
-          )
+
+        const contentLength = res.headers.get('content-length')
+        if (contentLength !== null) {
+          const declaredLen = Number(contentLength)
+          if (Number.isFinite(declaredLen) && declaredLen > MAX_IMAGE_BYTES) {
+            await res.body?.cancel().catch(() => {})
+            throw new ApwPdfError(
+              'LIMIT_EXCEEDED',
+              'Remote image exceeds 10 MB limit',
+            )
+          }
         }
-        return new Uint8Array(ab)
+
+        if (!res.body) {
+          return new Uint8Array(0)
+        }
+
+        const reader = res.body.getReader()
+        const chunks: Uint8Array[] = []
+        let totalBytes = 0
+        try {
+          while (true) {
+            let step: ReadableStreamReadResult<Uint8Array>
+            try {
+              step = await reader.read()
+            } catch (err) {
+              throw new ApwPdfError(
+                'IMAGE_LOAD_FAILED',
+                `Failed while reading remote image stream: ${err instanceof Error ? err.message : String(err)}`,
+              )
+            }
+            if (step.done) break
+            if (step.value) {
+              totalBytes += step.value.byteLength
+              if (totalBytes > MAX_IMAGE_BYTES) {
+                await reader.cancel().catch(() => {})
+                throw new ApwPdfError(
+                  'LIMIT_EXCEEDED',
+                  'Remote image exceeds 10 MB limit',
+                )
+              }
+              chunks.push(step.value)
+            }
+          }
+        } finally {
+          reader.releaseLock()
+        }
+
+        const out = new Uint8Array(totalBytes)
+        let offset = 0
+        for (const chunk of chunks) {
+          out.set(chunk, offset)
+          offset += chunk.byteLength
+        }
+        return out
       }
 
       if (ref.includes('\0') || path.isAbsolute(ref)) {
