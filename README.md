@@ -152,10 +152,10 @@ export function MemoScreen() {
   "version": 1,
   "page": {
     "size": "A4",
-    "margin": { "top": "1.5cm", "bottom": "2cm", "left": "3cm", "right": "2cm" },
-    "pageNumber": { "from": 2, "format": "- {n} -", "size": "15pt", "offset": "1.25cm" }
+    "margin": { "top": "1.5cm", "bottom": "2cm", "left": "3cm", "right": "2cm" }
   },
   "font": { "family": "THSarabunIT9", "size": "16pt" },
+  "pageNumber": { "from": 2, "format": "- {n} -", "size": "15pt", "offset": "1.25cm" },
   "blocks": [
     {
       "type": "columns",

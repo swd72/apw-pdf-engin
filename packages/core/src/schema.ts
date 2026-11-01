@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { ApwPdfError } from './errors.js'
 import { toPt, type Length } from './units.js'
+import { validateDocumentIntegrity } from './validate.js'
 
 const POSITIVE_LENGTH_RE = /^\d+(?:\.\d+)?(pt|mm|cm|in)$/
 const SIGNED_LENGTH_RE = /^-?\d+(?:\.\d+)?(pt|mm|cm|in)$/
@@ -306,6 +307,7 @@ export interface Cell {
   vAlign?: 'top' | 'middle' | 'bottom'
   border?: BorderSpec
   shade?: string
+  style?: string
 }
 
 export interface TableBlock {
@@ -422,6 +424,7 @@ const cellSchema: z.ZodType<Cell> = z.lazy(() =>
     vAlign: z.enum(['top', 'middle', 'bottom']).optional(),
     border: borderSpecSchema.optional(),
     shade: z.string().optional(),
+    style: z.string().optional(),
   }),
 )
 
@@ -633,7 +636,10 @@ export function formatZodPath(path: (string | number)[]): string {
   return out
 }
 
-export function parseDocument(input: unknown): DocumentDef {
+export function parseDocument(
+  input: unknown,
+  opts?: { strict?: boolean },
+): DocumentDef {
   const res = documentSchema.safeParse(input)
   if (!res.success) {
     const first = res.error.issues[0]
@@ -646,6 +652,17 @@ export function parseDocument(input: unknown): DocumentDef {
         details: res.error.issues,
       },
     )
+  }
+  const strict = opts?.strict ?? true
+  if (strict) {
+    const integrityIssues = validateDocumentIntegrity(input)
+    if (integrityIssues.length > 0) {
+      const first = integrityIssues[0]!
+      throw new ApwPdfError(first.code as any, first.message, {
+        path: first.path,
+        details: integrityIssues,
+      })
+    }
   }
   return res.data
 }

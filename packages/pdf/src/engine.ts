@@ -59,9 +59,10 @@ export async function createPdfEngine(
       data: unknown,
       renderOpts?: RenderPdfOptions,
     ): Promise<RenderPdfResult> {
-      const parsed = parseDocument(doc)
+      const strict = renderOpts?.strict ?? true
+      const parsed = parseDocument(doc, { strict })
       const tree = await coreEngine.layout(parsed, data, {
-        strict: renderOpts?.strict,
+        strict,
       })
       const bytes = await writePdf(tree, {
         fonts: coreEngine.fonts,

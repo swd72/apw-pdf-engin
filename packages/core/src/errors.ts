@@ -11,12 +11,16 @@ export type ErrorCode =
   | 'BLOCK_TOO_TALL'
   | 'SEGMENTER_UNAVAILABLE'
   | 'LIMIT_EXCEEDED'
+  | 'UNKNOWN_KEY'
+  | 'STYLE_NOT_FOUND'
 
 export type WarningCode =
   | 'MISSING_GLYPH'
   | 'FORCED_BREAK'
   | 'FONT_STYLE_FALLBACK'
   | 'MISSING_VARIABLE'
+  | 'UNKNOWN_KEY'
+  | 'STYLE_NOT_FOUND'
 
 export interface Warning {
   code: string

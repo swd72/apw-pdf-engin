@@ -178,7 +178,7 @@ describe('writePdf and createPdfEngine', () => {
         },
         {
           type: 'paragraph' as const,
-          runs: [{ checkbox: true, label: 'เลือก' }],
+          runs: [{ checkbox: true }, { text: 'เลือก' }],
         },
       ],
     }

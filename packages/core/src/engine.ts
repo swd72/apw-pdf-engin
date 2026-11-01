@@ -1,5 +1,5 @@
 import { bindDocument } from './bind/bind.js'
-import { ApwPdfError } from './errors.js'
+import { ApwPdfError, type Warning } from './errors.js'
 import { singleLineHeight } from './fonts/metrics.js'
 import type { FontProvider, ImageProvider } from './fonts/provider.js'
 import { FontRegistry } from './fonts/registry.js'
@@ -11,6 +11,7 @@ import './layout/signature.js'
 import './layout/table.js'
 import type { FontRef, LayoutTree } from './layout/tree.js'
 import { formatZodPath, parseDocument } from './schema.js'
+import { validateDocumentIntegrity } from './validate.js'
 import { pageBox, toPt } from './units.js'
 
 export interface ValidationIssue {
@@ -41,9 +42,13 @@ export async function createEngine(opts: {
   return {
     fonts,
     validate(doc: unknown, data: unknown): { ok: boolean; issues: ValidationIssue[] } {
+      const integrityIssues = validateDocumentIntegrity(doc)
       try {
-        const parsed = parseDocument(doc)
+        const parsed = parseDocument(doc, { strict: false })
         bindDocument(parsed, data, { strict: true })
+        if (integrityIssues.length > 0) {
+          return { ok: false, issues: integrityIssues }
+        }
         return { ok: true, issues: [] }
       } catch (err) {
         if (err instanceof ApwPdfError) {
@@ -53,16 +58,16 @@ export async function createEngine(opts: {
               code: 'SCHEMA_INVALID',
               message: String(zIssue.message ?? err.message),
             }))
-            return { ok: false, issues: issues.length > 0 ? issues : [{ path: err.path, code: err.code, message: err.message }] }
+            return { ok: false, issues: [...integrityIssues, ...(issues.length > 0 ? issues : [{ path: err.path, code: err.code, message: err.message }])] }
           }
           return {
             ok: false,
-            issues: [{ path: err.path, code: err.code, message: err.message }],
+            issues: [...integrityIssues, { path: err.path, code: err.code, message: err.message }],
           }
         }
         return {
           ok: false,
-          issues: [{ code: 'SCHEMA_INVALID', message: String(err) }],
+          issues: [...integrityIssues, { code: 'SCHEMA_INVALID', message: String(err) }],
         }
       }
     },
@@ -72,9 +77,17 @@ export async function createEngine(opts: {
       data: unknown,
       layoutOpts?: { strict?: boolean },
     ): Promise<LayoutTree> {
-      const parsed = parseDocument(doc)
+      const strict = layoutOpts?.strict ?? true
+      const parsed = parseDocument(doc, { strict })
+      const integrityWarnings: Warning[] = !strict
+        ? validateDocumentIntegrity(doc).map((iss) => ({
+            code: iss.code,
+            message: iss.message,
+            path: iss.path,
+          }))
+        : []
       const { doc: resolvedDoc, warnings: bindWarnings } = bindDocument(parsed, data, {
-        strict: layoutOpts?.strict ?? true,
+        strict,
       })
       const box = pageBox(resolvedDoc.page)
 
@@ -101,7 +114,7 @@ export async function createEngine(opts: {
         box,
         bodyTop,
         anchors: createAnchorTable(),
-        warnings: [...bindWarnings],
+        warnings: [...bindWarnings, ...integrityWarnings],
         imageCache: new Map(),
       }
 

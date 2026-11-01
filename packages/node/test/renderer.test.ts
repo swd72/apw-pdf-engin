@@ -140,4 +140,56 @@ describe('createRenderer', () => {
     )
     expect(Buffer.from(spaced).equals(Buffer.from(base))).toBe(false)
   })
+
+  it('validates unknown keys and undefined styles via renderer.validate (F3)', async () => {
+    const renderer = await createRenderer()
+    const baseDoc = {
+      version: 1 as const,
+      page: {
+        size: 'A4' as const,
+        margin: { top: '1.5cm', bottom: '2cm', left: '3cm', right: '2cm' },
+      },
+      font: { family: 'THSarabunIT9', size: '16pt' },
+    }
+
+    // 1. typo key
+    const resTypo = renderer.validate(
+      { ...baseDoc, blocks: [{ type: 'paragraph', text: 'x', aling: 'center' }] },
+      {},
+    )
+    expect(resTypo.ok).toBe(false)
+    expect(resTypo.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'UNKNOWN_KEY', path: 'blocks[0].aling' }),
+      ]),
+    )
+
+    // 2. undefined style
+    const resStyle = renderer.validate(
+      { ...baseDoc, blocks: [{ type: 'paragraph', text: 'x', style: 'noSuchStyle' }] },
+      {},
+    )
+    expect(resStyle.ok).toBe(false)
+    expect(resStyle.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'STYLE_NOT_FOUND', path: 'blocks[0].style' }),
+      ]),
+    )
+
+    // 3. tab run stray keys
+    const resTab = renderer.validate(
+      {
+        ...baseDoc,
+        blocks: [{ type: 'paragraph', runs: [{ tab: true, to: '@kho', leader: 'dots' }] }],
+      },
+      {},
+    )
+    expect(resTab.ok).toBe(false)
+    expect(resTab.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'UNKNOWN_KEY', path: 'blocks[0].runs[0].to' }),
+        expect.objectContaining({ code: 'UNKNOWN_KEY', path: 'blocks[0].runs[0].leader' }),
+      ]),
+    )
+  })
 })

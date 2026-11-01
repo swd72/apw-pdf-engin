@@ -1,6 +1,7 @@
 export * from './errors.js'
 export * from './units.js'
 export * from './schema.js'
+export * from './validate.js'
 export * from './thai/baht.js'
 export * from './thai/digits.js'
 export * from './thai/number.js'
