@@ -219,5 +219,32 @@ describe('fetchFontProvider and worker handleMessage', () => {
     })
     expect(wRes.ok).toBe(true)
     workerClient.dispose()
+
+    // Test Worker error handling (L12)
+    class CrashingWorker {
+      onmessage: ((ev: MessageEvent) => void) | null = null
+      onerror: ((ev: ErrorEvent) => void) | null = null
+      postMessage() {
+        setTimeout(() => {
+          this.onerror?.({} as ErrorEvent)
+        }, 5)
+      }
+      terminate() {}
+    }
+    vi.stubGlobal('Worker', CrashingWorker)
+    const crashClient = createRenderClient({
+      fontBaseUrl: '/fonts',
+      wasmUrl: '/harfbuzz-subset.wasm',
+      useWorker: true,
+    })
+    const crashRes = await crashClient.render({
+      doc: memo.document,
+      data: memo.example,
+    })
+    expect(crashRes.ok).toBe(false)
+    if (!crashRes.ok) {
+      expect(crashRes.error.code).toBe('WORKER_ERROR')
+    }
+    crashClient.dispose()
   })
 })

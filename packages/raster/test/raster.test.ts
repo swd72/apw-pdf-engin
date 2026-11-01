@@ -58,9 +58,38 @@ describe('rasterizePage', () => {
     expect(info300.height).toBe(info200.height)
   })
 
-  it('throws RangeError when pageNumber is out of range (0 or > pageCount)', async () => {
+  it('throws RangeError when pageNumber is out of range or canvas dimensions exceed cap (M10)', async () => {
     const pdfBytes = await createSampleA4Pdf()
     await expect(rasterizePage(pdfBytes, 0)).rejects.toThrow(RangeError)
     await expect(rasterizePage(pdfBytes, 2)).rejects.toThrow(RangeError)
+
+    // Create a 3500pt x 3500pt page (at 200 DPI -> 9722x9722 px > 8192px cap)
+    const subsetWasmBytes = await fs.readFile(
+      require.resolve('harfbuzzjs/dist/harfbuzz-subset.wasm'),
+    )
+    const engine = await createPdfEngine({
+      fonts: {
+        load: async (family, style) =>
+          new Uint8Array(
+            await fs.readFile(
+              path.join(fontsDir, fontFileName(family, style.bold, style.italic)),
+            ),
+          ),
+      },
+      subsetWasm: new Uint8Array(subsetWasmBytes),
+    })
+    const bigDoc: DocumentDef = {
+      version: 1,
+      page: {
+        size: { width: '3500pt', height: '3500pt' },
+        margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
+      },
+      font: { family: 'THSarabunIT9', size: '16pt' },
+      blocks: [{ type: 'paragraph', text: 'ใหญ่' }],
+    }
+    const { bytes: bigPdfBytes } = await engine.renderPdf(bigDoc, {})
+    await expect(rasterizePage(bigPdfBytes, 1, { dpi: 200 })).rejects.toThrow(
+      RangeError,
+    )
   })
 })
