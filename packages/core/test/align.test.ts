@@ -154,6 +154,52 @@ describe('line placement: alignment, tabs, anchors, Thai Distributed', () => {
     const clusterGrowth = firstClusterPlacedAdv - firstClusterOrigAdv
     expect(spaceGrowth / clusterGrowth).toBeCloseTo(4, 3)
 
+    // Verify exact 4:1 absolute formula: spaceGrowth = extra * 4 / totalWeight, clusterGrowth = extra * 1 / totalWeight
+    let totalWeight = 0
+    for (let i = 0; i < line0.items.length; i++) {
+      const it = line0.items[i]!
+      if (it.kind === 'space') {
+        totalWeight += DISTRIBUTE_WEIGHTS.space
+      } else if (it.kind === 'word') {
+        const uniqueClusters = new Set(it.shaped.glyphs.map((g) => g.cluster)).size
+        if (uniqueClusters > 1) {
+          totalWeight += (uniqueClusters - 1) * DISTRIBUTE_WEIGHTS.cluster
+        }
+        const nextIt = line0.items[i + 1]
+        if (nextIt && nextIt.kind === 'word' && nextIt.shaped.glyphs.length > 0) {
+          totalWeight += DISTRIBUTE_WEIGHTS.cluster
+        }
+      }
+    }
+    expect(spaceGrowth).toBeCloseTo((extra * DISTRIBUTE_WEIGHTS.space) / totalWeight, 4)
+    expect(clusterGrowth).toBeCloseTo((extra * DISTRIBUTE_WEIGHTS.cluster) / totalWeight, 4)
+
+    // Verify all glyphs (especially combining marks where orig advance === 0) keep their exact original dx/dy offsets
+    // and that every combining mark's rendered x-offset relative to its cluster base consonant is preserved
+    const origAllGlyphs = line0.items.flatMap((it) =>
+      it.kind === 'word' || it.kind === 'space' ? it.shaped.glyphs : [],
+    )
+    const placedAllGlyphs = runs.flatMap((r) => r.glyphs)
+    expect(placedAllGlyphs.length).toBe(origAllGlyphs.length)
+    let markCount = 0
+    for (let i = 0; i < origAllGlyphs.length; i++) {
+      if (origAllGlyphs[i]!.advance === 0) {
+        markCount++
+      }
+      expect(placedAllGlyphs[i]!.id).toBe(origAllGlyphs[i]!.id)
+      expect(placedAllGlyphs[i]!.dx).toBeCloseTo(origAllGlyphs[i]!.dx, 6)
+      expect(placedAllGlyphs[i]!.dy).toBeCloseTo(origAllGlyphs[i]!.dy, 6)
+    }
+    expect(markCount).toBe(15)
+    // Within the first cluster ('ด้', 2 glyphs at cluster 0), glyph 0 ('ด') keeps its exact natural advance
+    // so glyph 1 ('้') is drawn at the exact same offset relative to 'ด', and only the last glyph of the cluster
+    // carries the post-cluster extra advance
+    expect(runs[0]!.glyphs[0]!.advance).toBeCloseTo(firstWordOrig.shaped.glyphs[0]!.advance, 6)
+    expect(runs[0]!.glyphs[1]!.advance).toBeCloseTo(
+      firstWordOrig.shaped.glyphs[1]!.advance + clusterGrowth,
+      6,
+    )
+
     // Verify last line or endsWithBreak uses natural spacing
     const lastRuns = placeLine(lines[lines.length - 1]!, {
       x: 85.04,

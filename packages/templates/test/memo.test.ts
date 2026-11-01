@@ -104,14 +104,36 @@ describe('memo (บันทึกข้อความ) conformance', () => {
         i.kind === 'glyphs' && i.sourcePath.startsWith('blocks['),
     )
     const { item: toRun } = findRun(tree, 'เรียน')
-    const bodyRuns = glyphItems.filter((g) => g.y > toRun.y + 1 && !g.text.startsWith('('))
-    expect(bodyRuns.length).toBeGreaterThanOrEqual(2)
+    const { item: sigNameRun } = findRun(tree, '(')
+    const bodyRuns = glyphItems.filter(
+      (g) => g.y > toRun.y + 1 && g.y < sigNameRun.y - 1,
+    )
+    expect(bodyRuns.length).toBeGreaterThanOrEqual(4)
 
-    const firstBodyLine = bodyRuns[0]!
-    expect(firstBodyLine.x).toBeCloseTo(85.0394 + 70.8661, 2)
+    // Group body lines by paragraph sourcePath
+    const byPara = new Map<string, typeof bodyRuns>()
+    for (const run of bodyRuns) {
+      const list = byPara.get(run.sourcePath) ?? []
+      list.push(run)
+      byPara.set(run.sourcePath, list)
+    }
+    expect(byPara.size).toBe(2)
 
-    const firstLineWidth = firstBodyLine.glyphs.reduce((s, g) => s + g.advance, 0)
-    expect(firstBodyLine.x + firstLineWidth).toBeCloseTo(538.58, 2)
+    let totalNonLastLines = 0
+    for (const [, paraLines] of byPara) {
+      expect(paraLines.length).toBeGreaterThanOrEqual(2)
+      // First line of each body paragraph is indented by 2.5cm (70.8661pt)
+      expect(paraLines[0]!.x).toBeCloseTo(85.0394 + 70.8661, 2)
+
+      // Every non-last line of each body paragraph must end at 538.58 ± 0.01
+      for (let i = 0; i < paraLines.length - 1; i++) {
+        const line = paraLines[i]!
+        const lineWidth = line.glyphs.reduce((s, g) => s + g.advance, 0)
+        expect(line.x + lineWidth).toBeCloseTo(538.5827, 2)
+        totalNonLastLines += 1
+      }
+    }
+    expect(totalNonLastLines).toBeGreaterThanOrEqual(2)
   })
 
   it('places signature "(" at x = 311.81', async () => {

@@ -41,15 +41,7 @@ describe('externalLetter (หนังสือภายนอก) conformance',
 
   it('places first date glyph at x = 311.81', async () => {
     const tree = await layoutOf(externalLetter, externalLetter.example)
-    const { item: docNoRun } = findRun(tree, 'ที่')
-    const { item: subjectRun } = findRun(tree, 'เรื่อง')
-
-    const dateRuns = tree.pages[0]!.items.filter(
-      (i): i is Extract<typeof i, { kind: 'glyphs' }> =>
-        i.kind === 'glyphs' && i.y > docNoRun.y + 10 && i.y < subjectRun.y - 5,
-    )
-    expect(dateRuns.length).toBeGreaterThanOrEqual(1)
-    const dateRun = dateRuns[dateRuns.length - 1]!
+    const { item: dateRun } = findRun(tree, '๓๑ ตุลาคม ๒๕๖๙')
     expect(dateRun.x).toBeCloseTo(311.81, 2)
   })
 

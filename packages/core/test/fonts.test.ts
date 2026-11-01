@@ -62,6 +62,21 @@ describe('font registry, metrics, and shaping', () => {
     expect(r.width).toBeCloseTo((428 / 1000) * 16, 4)
   })
 
+  it('substitutes descenderless GSUB base glyphs for ญ and ฐ before below-vowels ุ/ู (Gap 4)', async () => {
+    const f = await reg.get('THSarabunIT9', false, false)
+    const yoNormal = f.shape('ญะ', 16).glyphs[0]!.id
+    const yoShortU = f.shape('ญุ', 16).glyphs[0]!.id
+    const yoShortUu = f.shape('ญู', 16).glyphs[0]!.id
+    expect(yoShortU).not.toBe(yoNormal)
+    expect(yoShortUu).toBe(yoShortU)
+
+    const thoNormal = f.shape('ฐะ', 16).glyphs[0]!.id
+    const thoShortU = f.shape('ฐุ', 16).glyphs[0]!.id
+    const thoShortUu = f.shape('ฐู', 16).glyphs[0]!.id
+    expect(thoShortU).not.toBe(thoNormal)
+    expect(thoShortUu).toBe(thoShortU)
+  })
+
   it.each(['ที่', 'น้ำ', 'กุ้ง', 'ญาติ', 'ฐาน', 'ปั้น'])(
     'shapes %s in every bundled family without missing glyphs',
     async (w) => {

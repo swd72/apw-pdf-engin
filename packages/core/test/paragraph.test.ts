@@ -216,4 +216,37 @@ describe('paragraph layout', () => {
     // Centered (overrides style's align: 'left')
     expect(layout.lines[0]!.runs[0]!.x).toBeGreaterThan(200)
   })
+
+  it('keeps firstLineIndent + toEnd fill on a single line ending at contentRight (Gap 4)', async () => {
+    const contentLeft = 85.0394
+    const contentWidth = 453.5433
+    const { layout } = await layoutParagraph(
+      {
+        type: 'paragraph',
+        firstLineIndent: '2.5cm',
+        runs: [
+          { text: 'ในระหว่างลาจะติดต่อข้าพเจ้าได้ที่  ' },
+          { fill: '๐๘ ๑๒๓๔ ๕๖๗๘', width: 'toEnd', leader: 'dots' },
+        ],
+      },
+      {
+        fonts,
+        base: baseFont,
+        dictionary: [],
+        contentLeft,
+        contentWidth,
+        anchors: createAnchorTable(),
+        path: 'blocks[0]',
+      },
+    )
+    expect(layout.lines.length).toBe(1)
+    expect(layout.lines[0]!.runs[0]!.x).toBeCloseTo(contentLeft + 70.8661, 2)
+    const leader = layout.lines[0]!.runs.shapes.find(
+      (s) => s.kind === 'line' && s.dash !== undefined,
+    )
+    expect(leader).toBeDefined()
+    if (leader && leader.kind === 'line') {
+      expect(leader.x2).toBeCloseTo(contentLeft + contentWidth, 2)
+    }
+  })
 })

@@ -108,20 +108,98 @@ describe('leave templates (ใบลาป่วย/กิจ/คลอด แ�
     expect(isCheckboxChecked(items, rects[2]!)).toBe(false)
   })
 
-  it('renders stats table with header ประเภทลา | ลามาแล้ว | ลาครั้งนี้ | รวมเป็น and 3 body rows', async () => {
+  it('renders stats table with 4x4 grid structure, column widths, borders, and cell values, plus specific dotted leader widths (toEnd, toTab, 1cm, 6cm)', async () => {
     const tree = await layoutOf(
       leaveSickPersonalMaternity,
       leaveSickPersonalMaternity.example,
     )
-    expect(findRun(tree, 'ประเภทลา')).toBeDefined()
-    expect(findRun(tree, 'ลามาแล้ว')).toBeDefined()
-    expect(findRun(tree, 'ลาครั้งนี้')).toBeDefined()
-    expect(findRun(tree, 'รวมเป็น')).toBeDefined()
+    const items = tree.pages[0]!.items
 
-    // 3 body rows: ป่วย, กิจส่วนตัว, คลอดบุตร
-    expect(findRun(tree, 'ป่วย')).toBeDefined()
-    expect(findRun(tree, 'กิจส่วนตัว')).toBeDefined()
-    expect(findRun(tree, 'คลอดบุตร')).toBeDefined()
+    // 1. Verify specific dotted leader widths: toEnd (x2 = 538.58), toTab (x2 at 6.5cm/7.5cm/8cm tab stops), 1cm (28.35pt), and 6cm (170.08pt)
+    const dottedLines = items.filter(
+      (i): i is Extract<typeof i, { kind: 'line' }> =>
+        i.kind === 'line' && Array.isArray(i.dash) && i.dash.length > 0,
+    )
+    // toEnd leaders ending at contentRight (538.5827pt)
+    const toEndLeaders = dottedLines.filter(
+      (l) => Math.abs(l.x2 - 538.5827) < 0.05,
+    )
+    expect(toEndLeaders.length).toBeGreaterThanOrEqual(6)
+
+    // toTab leaders ending at tab stops 6cm (255.12pt), 9cm (340.16pt), 11.5cm (411.02pt)
+    const toTab60 = dottedLines.find((l) => Math.abs(l.x2 - (85.0394 + 6 * 28.3465)) < 0.05)
+    const toTab90 = dottedLines.find((l) => Math.abs(l.x2 - (85.0394 + 9 * 28.3465)) < 0.05)
+    const toTab115 = dottedLines.find((l) => Math.abs(l.x2 - (85.0394 + 11.5 * 28.3465)) < 0.05)
+    expect(toTab60).toBeDefined()
+    expect(toTab90).toBeDefined()
+    expect(toTab115).toBeDefined()
+
+    // 1cm (28.3465pt) leader for days count
+    const oneCmLeaders = dottedLines.filter(
+      (l) => Math.abs(l.x2 - l.x1 - 28.3465) < 0.05,
+    )
+    expect(oneCmLeaders.length).toBeGreaterThanOrEqual(2)
+
+    // 6cm (170.0787pt) signature leaders
+    const sixCmLeaders = dottedLines.filter(
+      (l) => Math.abs(l.x2 - l.x1 - 170.0787) < 0.05,
+    )
+    expect(sixCmLeaders.length).toBe(4)
+
+    // 2. Verify stats table structure (4 columns: 2.2cm, 1.6cm, 1.6cm, 1.6cm x 4 rows = 16 cells)
+    const h1 = findRun(tree, 'ประเภทลา').item
+    const h2 = findRun(tree, 'ลามาแล้ว').item
+    const h3 = findRun(tree, 'ลาครั้งนี้').item
+    const h4 = findRun(tree, 'รวมเป็น').item
+    expect(h1.y).toBeCloseTo(h2.y, 2)
+    expect(h2.y).toBeCloseTo(h3.y, 2)
+    expect(h3.y).toBeCloseTo(h4.y, 2)
+
+    const colEdges = [
+      85.0394,
+      85.0394 + 62.3622,
+      85.0394 + 62.3622 + 45.3543,
+      85.0394 + 62.3622 + 2 * 45.3543,
+      85.0394 + 62.3622 + 3 * 45.3543,
+    ]
+    const headerItems = [h1, h2, h3, h4]
+    for (let c = 0; c < 4; c++) {
+      expect(headerItems[c]!.x).toBeGreaterThanOrEqual(colEdges[c]!)
+      expect(headerItems[c]!.x).toBeLessThan(colEdges[c + 1]!)
+    }
+
+    // 3 body rows: ป่วย, กิจส่วนตัว, คลอดบุตร, each with 4 cells on its row baseline
+    const r1 = findRun(tree, 'ป่วย').item
+    const r2 = findRun(tree, 'กิจส่วนตัว').item
+    const r3 = findRun(tree, 'คลอดบุตร').item
+    expect(r1.y).toBeGreaterThan(h1.y)
+    expect(r2.y).toBeGreaterThan(r1.y)
+    expect(r3.y).toBeGreaterThan(r2.y)
+
+    const tableGlyphs = items.filter(
+      (i): i is Extract<typeof i, { kind: 'glyphs' }> =>
+        i.kind === 'glyphs' && i.x < colEdges[4]! + 1 && i.y >= h1.y - 2 && i.y <= r3.y + 5,
+    )
+    for (const rowRun of [r1, r2, r3]) {
+      const cellsOnRow = tableGlyphs.filter((g) => Math.abs(g.y - rowRun.y) < 0.5)
+      expect(cellsOnRow.length).toBe(4)
+      for (let c = 0; c < 4; c++) {
+        expect(cellsOnRow[c]!.x).toBeGreaterThanOrEqual(colEdges[c]!)
+        expect(cellsOnRow[c]!.x).toBeLessThan(colEdges[c + 1]!)
+      }
+    }
+
+    // Solid border lines for the 4x4 table (5 horizontal row edges x 4 cols = 20 + 4 rows x 8 vertical cell sides = 32 -> 52 segments)
+    const solidTableLines = items.filter(
+      (i): i is Extract<typeof i, { kind: 'line' }> =>
+        i.kind === 'line' &&
+        !i.dash &&
+        i.x1 >= colEdges[0]! - 0.5 &&
+        i.x2 <= colEdges[4]! + 0.5 &&
+        i.y1 >= h1.y - 20 &&
+        i.y2 <= r3.y + 15,
+    )
+    expect(solidTableLines.length).toBe(52)
   })
 
   it('renders 6cm dotted signature lines after (ลงชื่อ), ผู้ตรวจสอบ label, date lines, and vacation substitute position/signature (T1, T2)', async () => {
