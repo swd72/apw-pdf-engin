@@ -125,6 +125,7 @@ describe('createRenderer', () => {
       server.close()
     }
   })
+
   it('applies external-letter paragraphSpacing when rendering by template name (N1)', async () => {
     const renderer = await createRenderer()
     const creationDate = new Date('2026-11-01T00:00:00Z')
@@ -191,5 +192,51 @@ describe('createRenderer', () => {
         expect.objectContaining({ code: 'UNKNOWN_KEY', path: 'blocks[0].runs[0].leader' }),
       ]),
     )
+  })
+
+  it('returns UNKNOWN_KEY and STYLE_NOT_FOUND warnings via renderer.renderToFile with strict: false', async () => {
+    const renderer = await createRenderer()
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'apw-render-warn-'))
+    const outFile1 = path.join(tmpDir, 'out1.pdf')
+    const outFile2 = path.join(tmpDir, 'out2.pdf')
+
+    try {
+      const baseDoc = {
+        version: 1 as const,
+        meta: { title: 'Test' },
+        page: {
+          size: 'A4',
+          orientation: 'portrait',
+          margin: { top: '1.5cm', bottom: '2cm', left: '3cm', right: '2cm' },
+        },
+        font: { family: 'THSarabunIT9', size: '16pt' },
+      }
+
+      const resTypo = await renderer.renderToFile(
+        { ...baseDoc, blocks: [{ type: 'paragraph', text: 'x', aling: 'center' }] },
+        {},
+        outFile1,
+        { strict: false },
+      )
+      expect(resTypo.warnings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'UNKNOWN_KEY', path: 'blocks[0].aling' }),
+        ]),
+      )
+
+      const resStyle = await renderer.renderToFile(
+        { ...baseDoc, blocks: [{ type: 'paragraph', text: 'x', style: 'noSuchStyle' }] },
+        {},
+        outFile2,
+        { strict: false },
+      )
+      expect(resStyle.warnings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'STYLE_NOT_FOUND', path: 'blocks[0].style' }),
+        ]),
+      )
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    }
   })
 })

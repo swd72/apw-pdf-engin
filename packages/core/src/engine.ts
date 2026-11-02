@@ -133,6 +133,7 @@ export async function createEngine(opts: {
         pages,
         fonts: fontRefs,
         warnings: allWarnings,
+        meta: resolvedDoc.meta,
       }
       Object.defineProperty(tree, 'imageCache', {
         value: flowCtx.imageCache,

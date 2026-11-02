@@ -1,4 +1,5 @@
 import type { Warning } from '../errors.js'
+import type { DocumentDef } from '../schema.js'
 
 export interface FontRef {
   id: number
@@ -60,5 +61,6 @@ export interface LayoutTree {
   pages: LayoutPage[]
   fonts: FontRef[]
   warnings: Warning[]
+  meta?: DocumentDef['meta']
   imageCache?: Map<string, Uint8Array>
 }
