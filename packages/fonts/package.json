@@ -2,19 +2,19 @@
   "name": "@apw-pdf/fonts",
   "version": "1.0.0",
   "type": "module",
-  "main": "./dist/index.cjs",
+  "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "default": "./dist/index.js"
     },
     "./node": {
       "types": "./dist/node.d.ts",
       "import": "./dist/node.js",
-      "require": "./dist/node.cjs"
+      "default": "./dist/node.js"
     },
     "./files/*": "./files/*"
   },

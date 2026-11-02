@@ -1,6 +1,6 @@
 import {
   createEngine,
-  parseDocument,
+
   type Engine,
   type FontProvider,
   type ImageProvider,
@@ -59,15 +59,16 @@ export async function createPdfEngine(
       data: unknown,
       renderOpts?: RenderPdfOptions,
     ): Promise<RenderPdfResult> {
-      const parsed = parseDocument(doc)
-      const tree = await coreEngine.layout(parsed, data, {
-        strict: renderOpts?.strict,
+      const strict = renderOpts?.strict ?? true
+
+      const tree = await coreEngine.layout(doc, data, {
+        strict,
       })
       const bytes = await writePdf(tree, {
         fonts: coreEngine.fonts,
         images: opts.images,
         subset,
-        meta: parsed.meta,
+        meta: tree.meta,
         creationDate: renderOpts?.creationDate,
       })
       return {

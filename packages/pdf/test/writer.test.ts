@@ -178,7 +178,7 @@ describe('writePdf and createPdfEngine', () => {
         },
         {
           type: 'paragraph' as const,
-          runs: [{ checkbox: true, label: 'เลือก' }],
+          runs: [{ checkbox: true }, { text: 'เลือก' }],
         },
       ],
     }
@@ -353,5 +353,30 @@ describe('writePdf and createPdfEngine', () => {
     const rawPdf = new TextDecoder('latin1').decode(spanBytes)
     expect(rawPdf).toContain('/Span << /ActualText <FEFF0E01> >> BDC')
     expect(rawPdf).toContain('EMC')
+  })
+
+  it('returns UNKNOWN_KEY and STYLE_NOT_FOUND warnings in non-strict renderPdf', async () => {
+    const engine = await getEngine()
+    const docTypo = {
+      ...BASE_DOC,
+      blocks: [{ type: 'paragraph' as const, text: 'x', aling: 'center' }],
+    }
+    const resTypo = await engine.renderPdf(docTypo, {}, { strict: false })
+    expect(resTypo.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'UNKNOWN_KEY', path: 'blocks[0].aling' }),
+      ]),
+    )
+
+    const docStyle = {
+      ...BASE_DOC,
+      blocks: [{ type: 'paragraph' as const, text: 'x', style: 'noSuchStyle' }],
+    }
+    const resStyle = await engine.renderPdf(docStyle, {}, { strict: false })
+    expect(resStyle.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'STYLE_NOT_FOUND', path: 'blocks[0].style' }),
+      ]),
+    )
   })
 })

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { ApwPdfError } from './errors.js'
 import { toPt, type Length } from './units.js'
+import { validateDocumentIntegrity } from './validate.js'
 
 const POSITIVE_LENGTH_RE = /^\d+(?:\.\d+)?(pt|mm|cm|in)$/
 const SIGNED_LENGTH_RE = /^-?\d+(?:\.\d+)?(pt|mm|cm|in)$/
@@ -53,11 +54,17 @@ export type LineSpacing =
   | { exactly: Length }
   | { atLeast: Length }
 
-export const lineSpacingSchema: z.ZodType<LineSpacing> = z.union([
-  z.literal('single'),
+export const lineSpacingObjectSchemas = [
   z.object({ multiple: z.number().positive() }).strict(),
   z.object({ exactly: lengthSchema }).strict(),
   z.object({ atLeast: lengthSchema }).strict(),
+] as const
+
+export const lineSpacingSchema: z.ZodType<LineSpacing> = z.union([
+  z.literal('single'),
+  lineSpacingObjectSchemas[0],
+  lineSpacingObjectSchemas[1],
+  lineSpacingObjectSchemas[2],
 ])
 
 export interface Anchor {
@@ -66,11 +73,13 @@ export interface Anchor {
   edge?: 'start' | 'end'
 }
 
-export const anchorSchema: z.ZodType<Anchor> = z.object({
+export const anchorObjectSchema = z.object({
   name: z.string().min(1),
   index: z.number().int().nonnegative(),
   edge: z.enum(['start', 'end']).optional(),
 })
+
+export const anchorSchema: z.ZodType<Anchor> = anchorObjectSchema
 
 export interface TabStop {
   at: Length | `@${string}`
@@ -91,11 +100,13 @@ const tabAtSchema = z.custom<Length | `@${string}`>(
   { message: 'Invalid tab stop position (expected length or "@anchor")' },
 )
 
-export const tabStopSchema: z.ZodType<TabStop> = z.object({
+export const tabStopObjectSchema = z.object({
   at: tabAtSchema,
   align: z.enum(['left', 'center', 'right', 'decimal']).optional(),
   leader: z.enum(['none', 'dots', 'line']).optional(),
 })
+
+export const tabStopSchema: z.ZodType<TabStop> = tabStopObjectSchema
 
 export interface ParagraphStyle {
   align?: 'left' | 'center' | 'right' | 'justify' | 'thaiDistributed'
@@ -118,6 +129,14 @@ export interface ParagraphStyle {
   widowControl?: boolean
 }
 
+export const styleFontSchema = z.object({
+  family: z.string().min(1).optional(),
+  size: fontSizeSchema.optional(),
+  bold: z.boolean().optional(),
+  italic: z.boolean().optional(),
+  color: z.string().optional(),
+})
+
 const paragraphStyleFields = {
   align: z.enum(['left', 'center', 'right', 'justify', 'thaiDistributed']).optional(),
   firstLineIndent: signedLengthSchema.optional(),
@@ -127,21 +146,15 @@ const paragraphStyleFields = {
   spaceAfter: lengthSchema.optional(),
   lineSpacing: lineSpacingSchema.optional(),
   tabs: z.array(tabStopSchema).optional(),
-  font: z
-    .object({
-      family: z.string().min(1).optional(),
-      size: fontSizeSchema.optional(),
-      bold: z.boolean().optional(),
-      italic: z.boolean().optional(),
-      color: z.string().optional(),
-    })
-    .optional(),
+  font: styleFontSchema.optional(),
   keepWithNext: z.boolean().optional(),
   keepLinesTogether: z.boolean().optional(),
   widowControl: z.boolean().optional(),
 }
 
-export const paragraphStyleSchema: z.ZodType<ParagraphStyle> = z.object(paragraphStyleFields)
+export const paragraphStyleObjectSchema = z.object(paragraphStyleFields)
+
+export const paragraphStyleSchema: z.ZodType<ParagraphStyle> = paragraphStyleObjectSchema
 
 export type InlineTextRun = {
   text: string
@@ -169,7 +182,7 @@ export type Inline =
   | { pageNumber: true }
   | { pageCount: true }
 
-const textRunSchema = z.object({
+export const textRunSchema = z.object({
   text: z.string(),
   bold: z.boolean().optional(),
   italic: z.boolean().optional(),
@@ -181,7 +194,7 @@ const textRunSchema = z.object({
   numerals: z.enum(['arabic', 'thai']).optional(),
 })
 
-const tabRunSchema = z.object({ tab: z.literal(true) })
+export const tabRunSchema = z.object({ tab: z.literal(true) })
 
 const fillWidthSchema = z.custom<Length | 'toTab' | 'toEnd'>(
   (val) => {
@@ -191,20 +204,20 @@ const fillWidthSchema = z.custom<Length | 'toTab' | 'toEnd'>(
   { message: 'Invalid fill width (expected length, "toTab", or "toEnd")' },
 )
 
-const fillRunSchema = z.object({
+export const fillRunSchema = z.object({
   fill: z.string(),
   width: fillWidthSchema,
   leader: z.enum(['dots', 'line', 'none']).optional(),
   align: z.enum(['left', 'center']).optional(),
 })
 
-const checkboxRunSchema = z.object({
+export const checkboxRunSchema = z.object({
   checkbox: z.union([z.boolean(), z.string()]),
 })
 
-const lineBreakRunSchema = z.object({ lineBreak: z.literal(true) })
-const pageNumberRunSchema = z.object({ pageNumber: z.literal(true) })
-const pageCountRunSchema = z.object({ pageCount: z.literal(true) })
+export const lineBreakRunSchema = z.object({ lineBreak: z.literal(true) })
+export const pageNumberRunSchema = z.object({ pageNumber: z.literal(true) })
+export const pageCountRunSchema = z.object({ pageCount: z.literal(true) })
 
 export const inlineSchema: z.ZodType<Inline> = z.any().superRefine((val, ctx) => {
   if (!val || typeof val !== 'object') {
@@ -273,17 +286,19 @@ export type BorderSpec =
       right?: boolean
     }
 
+export const borderObjectSchema = z.object({
+  width: lengthSchema.optional(),
+  color: z.string().optional(),
+  style: z.enum(['solid', 'dashed', 'dotted']).optional(),
+  top: z.boolean().optional(),
+  bottom: z.boolean().optional(),
+  left: z.boolean().optional(),
+  right: z.boolean().optional(),
+})
+
 export const borderSpecSchema: z.ZodType<BorderSpec> = z.union([
   z.boolean(),
-  z.object({
-    width: lengthSchema.optional(),
-    color: z.string().optional(),
-    style: z.enum(['solid', 'dashed', 'dotted']).optional(),
-    top: z.boolean().optional(),
-    bottom: z.boolean().optional(),
-    left: z.boolean().optional(),
-    right: z.boolean().optional(),
-  }),
+  borderObjectSchema,
 ])
 
 export type ColumnWidthSpec = Length | `${number}%` | '*'
@@ -306,6 +321,7 @@ export interface Cell {
   vAlign?: 'top' | 'middle' | 'bottom'
   border?: BorderSpec
   shade?: string
+  style?: string
 }
 
 export interface TableBlock {
@@ -382,7 +398,7 @@ export type Block =
   | EachBlock
   | IfBlock
 
-const paragraphBlockSchema = z.object({
+export const paragraphBlockSchema = z.object({
   type: z.literal('paragraph'),
   id: z.string().optional(),
   style: z.string().optional(),
@@ -396,34 +412,35 @@ const imageAnchorXSchema = z.custom<Length | 'center'>(
   { message: 'Invalid anchor x (expected length or "center")' },
 )
 
-const imageBlockSchema = z.object({
+export const imageAnchorSchema = z.object({
+  relativeTo: z.enum(['page', 'margin']),
+  x: imageAnchorXSchema,
+  y: signedLengthSchema,
+})
+
+export const imageBlockSchema = z.object({
   type: z.literal('image'),
   src: z.string().min(1),
   width: lengthSchema.optional(),
   height: lengthSchema.optional(),
   align: z.enum(['left', 'center', 'right']).optional(),
-  anchor: z
-    .object({
-      relativeTo: z.enum(['page', 'margin']),
-      x: imageAnchorXSchema,
-      y: signedLengthSchema,
-    })
-    .optional(),
+  anchor: imageAnchorSchema.optional(),
   spaceAfter: lengthSchema.optional(),
 })
 
-const cellSchema: z.ZodType<Cell> = z.lazy(() =>
-  z.object({
-    blocks: z.array(blockSchema).optional(),
-    text: z.string().optional(),
-    colSpan: z.number().int().positive().optional(),
-    rowSpan: z.number().int().positive().optional(),
-    align: z.string().optional(),
-    vAlign: z.enum(['top', 'middle', 'bottom']).optional(),
-    border: borderSpecSchema.optional(),
-    shade: z.string().optional(),
-  }),
-)
+export const cellObjectSchema = z.object({
+  blocks: z.lazy(() => z.array(blockSchema)).optional(),
+  text: z.string().optional(),
+  colSpan: z.number().int().positive().optional(),
+  rowSpan: z.number().int().positive().optional(),
+  align: z.string().optional(),
+  vAlign: z.enum(['top', 'middle', 'bottom']).optional(),
+  border: borderSpecSchema.optional(),
+  shade: z.string().optional(),
+  style: z.string().optional(),
+})
+
+export const cellSchema: z.ZodType<Cell> = z.lazy(() => cellObjectSchema)
 
 const safeIdentifierSchema = z
   .string()
@@ -433,23 +450,25 @@ const safeIdentifierSchema = z
     'Reserved identifier is not allowed',
   )
 
-const tableRowsSchema = z.union([
+export const tableColumnSchema = z.object({
+  width: columnWidthSpecSchema,
+  align: z.string().optional(),
+})
+
+export const tableEachRowsSchema = z.object({
+  each: z.string().min(1),
+  as: safeIdentifierSchema,
+  cells: z.array(cellSchema),
+})
+
+export const tableRowsSchema = z.union([
   z.array(z.array(cellSchema)),
-  z.object({
-    each: z.string().min(1),
-    as: safeIdentifierSchema,
-    cells: z.array(cellSchema),
-  }),
+  tableEachRowsSchema,
 ])
 
-const tableBlockSchema = z.object({
+export const tableBlockSchema = z.object({
   type: z.literal('table'),
-  columns: z.array(
-    z.object({
-      width: columnWidthSpecSchema,
-      align: z.string().optional(),
-    }),
-  ),
+  columns: z.array(tableColumnSchema),
   header: z.array(z.array(cellSchema)).optional(),
   rows: tableRowsSchema,
   footer: z.array(z.array(cellSchema)).optional(),
@@ -459,15 +478,15 @@ const tableBlockSchema = z.object({
   allowRowSplit: z.boolean().optional(),
 })
 
-const columnsBlockSchema = z.object({
+export const columnsColumnSchema = z.object({
+  width: columnWidthSpecSchema,
+  align: z.enum(['left', 'right']).optional(),
+  blocks: z.lazy(() => z.array(blockSchema)),
+})
+
+export const columnsBlockSchema = z.object({
   type: z.literal('columns'),
-  columns: z.array(
-    z.object({
-      width: columnWidthSpecSchema,
-      align: z.enum(['left', 'right']).optional(),
-      blocks: z.lazy(() => z.array(blockSchema)),
-    }),
-  ),
+  columns: z.array(columnsColumnSchema),
   gap: lengthSchema.optional(),
   keepTogether: z.boolean().optional(),
 })
@@ -477,7 +496,7 @@ const signatureStartAtSchema = z.custom<Length | 'center'>(
   { message: 'Invalid signature startAt (expected length or "center")' },
 )
 
-const signatureBlockSchema = z.object({
+export const signatureBlockSchema = z.object({
   type: z.literal('signature'),
   startAt: signatureStartAtSchema.optional(),
   linesBefore: z.number().int().positive().optional(),
@@ -489,12 +508,14 @@ const signatureBlockSchema = z.object({
   minLinesBefore: z.number().int().nonnegative().optional(),
 })
 
-const spacerBlockSchema = z.object({
+export const spacerLinesSchema = z.object({ lines: z.number().positive() })
+
+export const spacerBlockSchema = z.object({
   type: z.literal('spacer'),
-  height: z.union([lengthSchema, z.object({ lines: z.number().positive() })]),
+  height: z.union([lengthSchema, spacerLinesSchema]),
 })
 
-const lineBlockSchema = z.object({
+export const lineBlockSchema = z.object({
   type: z.literal('line'),
   thickness: lengthSchema.optional(),
   style: z.enum(['solid', 'dashed', 'dotted']).optional(),
@@ -502,18 +523,18 @@ const lineBlockSchema = z.object({
   spaceAfter: lengthSchema.optional(),
 })
 
-const pageBreakBlockSchema = z.object({
+export const pageBreakBlockSchema = z.object({
   type: z.literal('pageBreak'),
 })
 
-const eachBlockSchema = z.object({
+export const eachBlockSchema = z.object({
   type: z.literal('each'),
   of: z.string().min(1),
   as: safeIdentifierSchema,
   blocks: z.lazy(() => z.array(blockSchema)),
 })
 
-const ifBlockSchema = z.object({
+export const ifBlockSchema = z.object({
   type: z.literal('if'),
   test: z.string().min(1),
   then: z.lazy(() => z.array(blockSchema)),
@@ -566,50 +587,101 @@ export interface DocumentDef {
   blocks: Block[]
 }
 
-export const documentSchema: z.ZodType<DocumentDef> = z.object({
+export const metaSchema = z.object({
+  title: z.string().optional(),
+  author: z.string().optional(),
+  subject: z.string().optional(),
+  keywords: z.array(z.string()).optional(),
+})
+
+export const pageSizeObjSchema = z.object({
+  width: pageDimensionSchema,
+  height: pageDimensionSchema,
+})
+
+export const pageMarginSchema = z.object({
+  top: lengthSchema,
+  bottom: lengthSchema,
+  left: lengthSchema,
+  right: lengthSchema,
+})
+
+export const pageSchema = z.object({
+  size: z.union([
+    z.enum(['A4', 'A5', 'Letter', 'Legal']),
+    pageSizeObjSchema,
+  ]),
+  orientation: z.enum(['portrait', 'landscape']).optional(),
+  margin: pageMarginSchema,
+})
+
+export const fontSchema = z.object({
+  family: z.string().min(1),
+  size: fontSizeSchema,
+  lineSpacing: lineSpacingSchema.optional(),
+  color: z.string().optional(),
+})
+
+export const pageNumberSchema = z.object({
+  from: z.number().int().positive().optional(),
+  position: z.enum(['top-center', 'bottom-center', 'top-right', 'bottom-right']).optional(),
+  format: z.string().optional(),
+  size: fontSizeSchema.optional(),
+  offset: lengthSchema.optional(),
+})
+
+export const documentObjectSchema = z.object({
   version: z.literal(1),
-  meta: z
-    .object({
-      title: z.string().optional(),
-      author: z.string().optional(),
-      subject: z.string().optional(),
-      keywords: z.array(z.string()).optional(),
-    })
-    .optional(),
-  page: z.object({
-    size: z.union([
-      z.enum(['A4', 'A5', 'Letter', 'Legal']),
-      z.object({ width: pageDimensionSchema, height: pageDimensionSchema }),
-    ]),
-    orientation: z.enum(['portrait', 'landscape']).optional(),
-    margin: z.object({
-      top: lengthSchema,
-      bottom: lengthSchema,
-      left: lengthSchema,
-      right: lengthSchema,
-    }),
-  }),
-  font: z.object({
-    family: z.string().min(1),
-    size: fontSizeSchema,
-    lineSpacing: lineSpacingSchema.optional(),
-    color: z.string().optional(),
-  }),
+  meta: metaSchema.optional(),
+  page: pageSchema,
+  font: fontSchema,
   numerals: z.enum(['arabic', 'thai']).optional(),
-  pageNumber: z
-    .object({
-      from: z.number().int().positive().optional(),
-      position: z.enum(['top-center', 'bottom-center', 'top-right', 'bottom-right']).optional(),
-      format: z.string().optional(),
-      size: fontSizeSchema.optional(),
-      offset: lengthSchema.optional(),
-    })
-    .optional(),
+  pageNumber: pageNumberSchema.optional(),
   styles: z.record(z.string(), paragraphStyleSchema).optional(),
   dictionary: z.array(z.string()).optional(),
   assets: z.record(z.string(), z.string()).optional(),
   blocks: z.array(blockSchema),
 })
+
+export const documentSchema: z.ZodType<DocumentDef> = documentObjectSchema
+
+export const SCHEMA_SHAPES = {
+  document: documentObjectSchema,
+  meta: metaSchema,
+  page: pageSchema,
+  pageSizeObj: pageSizeObjSchema,
+  pageMargin: pageMarginSchema,
+  font: fontSchema,
+  pageNumber: pageNumberSchema,
+  paragraphStyle: paragraphStyleObjectSchema,
+  styleFont: styleFontSchema,
+  tabStop: tabStopObjectSchema,
+  paragraphBlock: paragraphBlockSchema,
+  imageBlock: imageBlockSchema,
+  imageAnchor: imageAnchorSchema,
+  tableBlock: tableBlockSchema,
+  tableColumn: tableColumnSchema,
+  tableEachRows: tableEachRowsSchema,
+  cell: cellObjectSchema,
+  border: borderObjectSchema,
+  columnsBlock: columnsBlockSchema,
+  columnsCol: columnsColumnSchema,
+  signatureBlock: signatureBlockSchema,
+  spacerBlock: spacerBlockSchema,
+  spacerHeightObj: spacerLinesSchema,
+  lineBlock: lineBlockSchema,
+  pageBreakBlock: pageBreakBlockSchema,
+  eachBlock: eachBlockSchema,
+  ifBlock: ifBlockSchema,
+  textRun: textRunSchema,
+  anchor: anchorObjectSchema,
+  tabRun: tabRunSchema,
+  fillRun: fillRunSchema,
+  checkboxRun: checkboxRunSchema,
+  lineBreakRun: lineBreakRunSchema,
+  pageNumberRun: pageNumberRunSchema,
+  pageCountRun: pageCountRunSchema,
+} as const
 
 export interface TemplateDef {
   name: string
@@ -633,7 +705,10 @@ export function formatZodPath(path: (string | number)[]): string {
   return out
 }
 
-export function parseDocument(input: unknown): DocumentDef {
+export function parseDocument(
+  input: unknown,
+  opts?: { strict?: boolean },
+): DocumentDef {
   const res = documentSchema.safeParse(input)
   if (!res.success) {
     const first = res.error.issues[0]
@@ -646,6 +721,17 @@ export function parseDocument(input: unknown): DocumentDef {
         details: res.error.issues,
       },
     )
+  }
+  const strict = opts?.strict ?? true
+  if (strict) {
+    const integrityIssues = validateDocumentIntegrity(input)
+    if (integrityIssues.length > 0) {
+      const first = integrityIssues[0]!
+      throw new ApwPdfError(first.code as any, first.message, {
+        path: first.path,
+        details: integrityIssues,
+      })
+    }
   }
   return res.data
 }

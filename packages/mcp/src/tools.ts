@@ -21,7 +21,7 @@ export const BLOCKS_SECTION = `## Block Types (ชนิดของบล็อ
 
 1. **paragraph**:
 \`\`\`json
-{ "type": "paragraph", "text": "จึงเรียนมาเพื่อโปรดพิจารณา", "style": { "firstLineIndent": "2.5cm", "align": "thaiDistributed" } }
+{ "type": "paragraph", "text": "จึงเรียนมาเพื่อโปรดพิจารณา", "firstLineIndent": "2.5cm", "align": "thaiDistributed" }
 \`\`\`
 
 2. **image**:
@@ -36,12 +36,12 @@ export const BLOCKS_SECTION = `## Block Types (ชนิดของบล็อ
 
 4. **table**:
 \`\`\`json
-{ "type": "table", "columns": ["40%", "30%", "30%"], "repeatHeader": true, "header": [[{ "text": "รายการ" }, { "text": "จำนวน" }, { "text": "หมายเหตุ" }]], "rows": [[{ "text": "ปากกา" }, { "text": "10" }, { "text": "-" }]] }
+{ "type": "table", "columns": [{ "width": "40%" }, { "width": "30%" }, { "width": "30%" }], "repeatHeader": true, "header": [[{ "text": "รายการ" }, { "text": "จำนวน" }, { "text": "หมายเหตุ" }]], "rows": [[{ "text": "ปากกา" }, { "text": "10" }, { "text": "-" }]] }
 \`\`\`
 
 5. **signature**:
 \`\`\`json
-{ "type": "signature", "closing": "ขอแสดงความนับถือ", "name": "{{signer.name}}", "positions": ["{{signer.positions}}"], "left": "50%", "width": "50%", "minLinesBefore": 3 }
+{ "type": "signature", "name": "{{signer.name}}", "positions": ["{{signer.positions}}"], "startAt": "center", "minLinesBefore": 3 }
 \`\`\`
 
 6. **spacer**:
@@ -61,7 +61,7 @@ export const BLOCKS_SECTION = `## Block Types (ชนิดของบล็อ
 
 9. **each**:
 \`\`\`json
-{ "type": "each", "items": "body", "as": "p", "blocks": [{ "type": "paragraph", "text": "{{p}}" }] }
+{ "type": "each", "of": "body", "as": "p", "blocks": [{ "type": "paragraph", "text": "{{p}}" }] }
 \`\`\`
 
 10. **if**:
@@ -73,31 +73,46 @@ export const INLINE_SECTION = `## Inline Run Types (ชนิดของ \`runs
 
 1. **TextRun**:
 \`\`\`json
-{ "text": "ส่วนราชการ ", "bold": true, "size": "20pt" }
+{ "text": "บันทึกข้อความ", "bold": true, "size": "29pt", "anchors": [{ "name": "kho", "index": 6, "edge": "start" }] }
 \`\`\`
 
 2. **Tab**:
 \`\`\`json
-{ "tab": true, "to": "@kho", "leader": "dot" }
+{ "tab": true }
 \`\`\`
 
 3. **Fill** (เส้นประ/เส้นเต็มเติมช่องว่าง):
 \`\`\`json
-{ "fill": "dot", "width": "toEnd" }
+{ "fill": "{{agency}}", "width": "toEnd", "leader": "dots" }
 \`\`\`
 
-4. **Anchor** (จุดอ้างอิงแนวตั้งข้ามบรรทัด):
+4. **Checkbox** (กล่องสี่เหลี่ยมเช็คบ็อกซ์):
 \`\`\`json
-{ "anchor": "kho" }
+{ "checkbox": true }
+\`\`\`
+
+5. **LineBreak** (ขึ้นบรรทัดใหม่ภายในย่อหน้าเดิม):
+\`\`\`json
+{ "lineBreak": true }
+\`\`\`
+
+6. **PageNumber** (หมายเลขหน้าปัจจุบัน):
+\`\`\`json
+{ "pageNumber": true }
+\`\`\`
+
+7. **PageCount** (จำนวนหน้าทั้งหมด):
+\`\`\`json
+{ "pageCount": true }
 \`\`\``
 
 export const FILTERS_SECTION = `## Filters (ตัวกรองข้อมูลใน \`{{expr | filter}}\`)
 
 | Filter | ตัวอย่าง | ผลลัพธ์ |
 |---|---|---|
-| \`thaiDate\` | \`{{date \\| thaiDate:'long'}}\` | \`31 ตุลาคม 2569\` (\`'full'\` เพิ่ม พ.ศ., \`'short'\` ย่อเดือน) |
-| \`thaiDigits\` | \`{{docNo \\| thaiDigits}}\` | แปลงตัวเลขอารบิกเป็นเลขไทย ๐-๙ |
-| \`arabicDigits\` | \`{{text \\| arabicDigits}}\` | แปลงเลขไทยเป็นเลขอารบิก 0-9 |
+| \`thaiDate\` | \`{{date \\| thaiDate:'long'}}\` | \`31 ตุลาคม 2569\` (\`'short'\` = \`31 ต.ค. 69\`, \`'monthYear'\` = \`ตุลาคม 2569\`) |
+| \`thaiNum\` | \`{{docNo \\| thaiNum}}\` | แปลงตัวเลขอารบิกเป็นเลขไทย ๐-๙ |
+| \`prefix\` | \`{{docNo \\| prefix:'ที่ '}}\` | เติมคำนำหน้าเมื่อมีค่า |
 | \`number\` | \`{{amount \\| number:2}}\` | \`1,234.50\` |
 | \`baht\` | \`{{amount \\| baht}}\` | \`หนึ่งพันสองร้อยสามสิบสี่บาทห้าสิบสตางค์\` |
 | \`upper\` / \`lower\` | \`{{code \\| upper}}\` | ตัวพิมพ์ใหญ่ / ตัวพิมพ์เล็ก |
