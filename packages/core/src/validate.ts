@@ -1,139 +1,51 @@
 import type { ValidationIssue } from './engine.js'
+import { SCHEMA_SHAPES, lineSpacingObjectSchemas } from './schema.js'
 
 function isObject(val: unknown): val is Record<string, unknown> {
   return typeof val === 'object' && val !== null && !Array.isArray(val)
 }
 
-const DOCUMENT_KEYS = new Set([
-  'version',
-  'meta',
-  'page',
-  'font',
-  'numerals',
-  'pageNumber',
-  'styles',
-  'dictionary',
-  'assets',
-  'blocks',
-])
+function shapeKeys(schema: { shape: Record<string, unknown> }): Set<string> {
+  return new Set(Object.keys(schema.shape))
+}
 
-const META_KEYS = new Set(['title', 'author', 'subject', 'keywords'])
-const PAGE_KEYS = new Set(['size', 'orientation', 'margin'])
-const PAGE_SIZE_OBJ_KEYS = new Set(['width', 'height'])
-const PAGE_MARGIN_KEYS = new Set(['top', 'bottom', 'left', 'right'])
-const FONT_KEYS = new Set(['family', 'size', 'lineSpacing', 'color'])
-const LINE_SPACING_KEYS = new Set(['multiple', 'exactly', 'atLeast'])
-const PAGE_NUMBER_KEYS = new Set(['from', 'position', 'format', 'size', 'offset'])
+let _keySets: Record<string, Set<string>> | null = null
 
-const PARAGRAPH_STYLE_KEYS = new Set([
-  'align',
-  'firstLineIndent',
-  'indentLeft',
-  'indentRight',
-  'spaceBefore',
-  'spaceAfter',
-  'lineSpacing',
-  'tabs',
-  'font',
-  'keepWithNext',
-  'keepLinesTogether',
-  'widowControl',
-])
+export function getKeySets(): Record<string, Set<string>> {
+  if (!_keySets) {
+    const sets: Record<string, Set<string>> = {}
+    for (const [key, schema] of Object.entries(SCHEMA_SHAPES)) {
+      sets[key] = shapeKeys(schema)
+    }
+    sets.lineSpacing = new Set(lineSpacingObjectSchemas.flatMap((s) => Object.keys(s.shape)))
+    _keySets = sets
+  }
+  return _keySets
+}
 
-const STYLE_FONT_KEYS = new Set(['family', 'size', 'bold', 'italic', 'color'])
-const TAB_STOP_KEYS = new Set(['at', 'align', 'leader'])
-
-const PARAGRAPH_BLOCK_KEYS = new Set([
-  'type',
-  'id',
-  'style',
-  'text',
-  'runs',
-  ...PARAGRAPH_STYLE_KEYS,
-])
-
-const IMAGE_BLOCK_KEYS = new Set([
-  'type',
-  'src',
-  'width',
-  'height',
-  'align',
-  'anchor',
-  'spaceAfter',
-])
-const IMAGE_ANCHOR_KEYS = new Set(['relativeTo', 'x', 'y'])
-
-const TABLE_BLOCK_KEYS = new Set([
-  'type',
-  'columns',
-  'header',
-  'rows',
-  'footer',
-  'repeatHeader',
-  'border',
-  'cellPadding',
-  'allowRowSplit',
-])
-const TABLE_COLUMN_KEYS = new Set(['width', 'align'])
-const TABLE_EACH_ROWS_KEYS = new Set(['each', 'as', 'cells'])
-const CELL_KEYS = new Set([
-  'blocks',
-  'text',
-  'colSpan',
-  'rowSpan',
-  'align',
-  'vAlign',
-  'border',
-  'shade',
-  'style',
-])
-const BORDER_KEYS = new Set(['width', 'color', 'style', 'top', 'bottom', 'left', 'right'])
-
-const COLUMNS_BLOCK_KEYS = new Set(['type', 'columns', 'gap', 'keepTogether'])
-const COLUMNS_COL_KEYS = new Set(['width', 'align', 'blocks'])
-
-const SIGNATURE_BLOCK_KEYS = new Set([
-  'type',
-  'startAt',
-  'linesBefore',
-  'prefix',
-  'image',
-  'imageHeight',
-  'name',
-  'positions',
-  'minLinesBefore',
-])
-
-const SPACER_BLOCK_KEYS = new Set(['type', 'height'])
-const SPACER_HEIGHT_OBJ_KEYS = new Set(['lines'])
-
-const LINE_BLOCK_KEYS = new Set(['type', 'thickness', 'style', 'spaceBefore', 'spaceAfter'])
-const PAGE_BREAK_BLOCK_KEYS = new Set(['type'])
-const EACH_BLOCK_KEYS = new Set(['type', 'of', 'as', 'blocks'])
-const IF_BLOCK_KEYS = new Set(['type', 'test', 'then', 'else'])
-
-const TEXT_RUN_KEYS = new Set([
-  'text',
-  'bold',
-  'italic',
-  'underline',
-  'size',
-  'family',
-  'color',
-  'anchors',
-  'numerals',
-])
-const ANCHOR_KEYS = new Set(['name', 'index', 'edge'])
-const TAB_RUN_KEYS = new Set(['tab'])
-const FILL_RUN_KEYS = new Set(['fill', 'width', 'leader', 'align'])
-const CHECKBOX_RUN_KEYS = new Set(['checkbox'])
-const LINE_BREAK_RUN_KEYS = new Set(['lineBreak'])
-const PAGE_NUMBER_RUN_KEYS = new Set(['pageNumber'])
-const PAGE_COUNT_RUN_KEYS = new Set(['pageCount'])
+export const INTEGRITY_KEY_SETS: Record<string, Set<string>> = new Proxy(
+  {} as Record<string, Set<string>>,
+  {
+    get(_target, prop: string) {
+      return getKeySets()[prop]
+    },
+    ownKeys() {
+      return Object.keys(getKeySets())
+    },
+    getOwnPropertyDescriptor(_target, prop: string) {
+      return {
+        enumerable: true,
+        configurable: true,
+        value: getKeySets()[prop],
+      }
+    },
+  },
+)
 
 export function validateDocumentIntegrity(doc: unknown): ValidationIssue[] {
   if (!isObject(doc)) return []
   const issues: ValidationIssue[] = []
+  const keys = getKeySets()
 
   function checkUnknownKeys(
     obj: Record<string, unknown>,
@@ -152,37 +64,37 @@ export function validateDocumentIntegrity(doc: unknown): ValidationIssue[] {
   }
 
   // 1. Top-level DocumentDef
-  checkUnknownKeys(doc, DOCUMENT_KEYS, '')
+  checkUnknownKeys(doc, keys.document, '')
 
   const documentStyles = isObject(doc.styles) ? doc.styles : undefined
 
   // Meta
   if (isObject(doc.meta)) {
-    checkUnknownKeys(doc.meta, META_KEYS, 'meta')
+    checkUnknownKeys(doc.meta, keys.meta, 'meta')
   }
 
   // Page
   if (isObject(doc.page)) {
-    checkUnknownKeys(doc.page, PAGE_KEYS, 'page')
+    checkUnknownKeys(doc.page, keys.page, 'page')
     if (isObject(doc.page.size)) {
-      checkUnknownKeys(doc.page.size, PAGE_SIZE_OBJ_KEYS, 'page.size')
+      checkUnknownKeys(doc.page.size, keys.pageSizeObj, 'page.size')
     }
     if (isObject(doc.page.margin)) {
-      checkUnknownKeys(doc.page.margin, PAGE_MARGIN_KEYS, 'page.margin')
+      checkUnknownKeys(doc.page.margin, keys.pageMargin, 'page.margin')
     }
   }
 
   // Font
   if (isObject(doc.font)) {
-    checkUnknownKeys(doc.font, FONT_KEYS, 'font')
+    checkUnknownKeys(doc.font, keys.font, 'font')
     if (isObject(doc.font.lineSpacing)) {
-      checkUnknownKeys(doc.font.lineSpacing, LINE_SPACING_KEYS, 'font.lineSpacing')
+      checkUnknownKeys(doc.font.lineSpacing, keys.lineSpacing, 'font.lineSpacing')
     }
   }
 
   // PageNumber
   if (isObject(doc.pageNumber)) {
-    checkUnknownKeys(doc.pageNumber, PAGE_NUMBER_KEYS, 'pageNumber')
+    checkUnknownKeys(doc.pageNumber, keys.pageNumber, 'pageNumber')
   }
 
   function validateParagraphStyleFields(
@@ -190,15 +102,15 @@ export function validateDocumentIntegrity(doc: unknown): ValidationIssue[] {
     basePath: string,
   ): void {
     if (isObject(styleObj.font)) {
-      checkUnknownKeys(styleObj.font, STYLE_FONT_KEYS, `${basePath}.font`)
+      checkUnknownKeys(styleObj.font, keys.styleFont, `${basePath}.font`)
     }
     if (isObject(styleObj.lineSpacing)) {
-      checkUnknownKeys(styleObj.lineSpacing, LINE_SPACING_KEYS, `${basePath}.lineSpacing`)
+      checkUnknownKeys(styleObj.lineSpacing, keys.lineSpacing, `${basePath}.lineSpacing`)
     }
     if (Array.isArray(styleObj.tabs)) {
       styleObj.tabs.forEach((tab, tIdx) => {
         if (isObject(tab)) {
-          checkUnknownKeys(tab, TAB_STOP_KEYS, `${basePath}.tabs[${tIdx}]`)
+          checkUnknownKeys(tab, keys.tabStop, `${basePath}.tabs[${tIdx}]`)
         }
       })
     }
@@ -208,7 +120,7 @@ export function validateDocumentIntegrity(doc: unknown): ValidationIssue[] {
   if (isObject(doc.styles)) {
     for (const [sName, sVal] of Object.entries(doc.styles)) {
       if (isObject(sVal)) {
-        checkUnknownKeys(sVal, PARAGRAPH_STYLE_KEYS, `styles.${sName}`)
+        checkUnknownKeys(sVal, keys.paragraphStyle, `styles.${sName}`)
         validateParagraphStyleFields(sVal, `styles.${sName}`)
       }
     }
@@ -217,23 +129,23 @@ export function validateDocumentIntegrity(doc: unknown): ValidationIssue[] {
   function validateInlineRun(run: unknown, path: string): void {
     if (!isObject(run)) return
     if ('tab' in run) {
-      checkUnknownKeys(run, TAB_RUN_KEYS, path)
+      checkUnknownKeys(run, keys.tabRun, path)
     } else if ('fill' in run) {
-      checkUnknownKeys(run, FILL_RUN_KEYS, path)
+      checkUnknownKeys(run, keys.fillRun, path)
     } else if ('checkbox' in run) {
-      checkUnknownKeys(run, CHECKBOX_RUN_KEYS, path)
+      checkUnknownKeys(run, keys.checkboxRun, path)
     } else if ('lineBreak' in run) {
-      checkUnknownKeys(run, LINE_BREAK_RUN_KEYS, path)
+      checkUnknownKeys(run, keys.lineBreakRun, path)
     } else if ('pageNumber' in run) {
-      checkUnknownKeys(run, PAGE_NUMBER_RUN_KEYS, path)
+      checkUnknownKeys(run, keys.pageNumberRun, path)
     } else if ('pageCount' in run) {
-      checkUnknownKeys(run, PAGE_COUNT_RUN_KEYS, path)
+      checkUnknownKeys(run, keys.pageCountRun, path)
     } else if ('text' in run) {
-      checkUnknownKeys(run, TEXT_RUN_KEYS, path)
+      checkUnknownKeys(run, keys.textRun, path)
       if (Array.isArray(run.anchors)) {
         run.anchors.forEach((anc, aIdx) => {
           if (isObject(anc)) {
-            checkUnknownKeys(anc, ANCHOR_KEYS, `${path}.anchors[${aIdx}]`)
+            checkUnknownKeys(anc, keys.anchor, `${path}.anchors[${aIdx}]`)
           }
         })
       }
@@ -242,7 +154,7 @@ export function validateDocumentIntegrity(doc: unknown): ValidationIssue[] {
 
   function validateCell(cell: unknown, path: string): void {
     if (!isObject(cell)) return
-    checkUnknownKeys(cell, CELL_KEYS, path)
+    checkUnknownKeys(cell, keys.cell, path)
 
     if (typeof cell.style === 'string') {
       if (!documentStyles || !Object.hasOwn(documentStyles, cell.style)) {
@@ -255,7 +167,7 @@ export function validateDocumentIntegrity(doc: unknown): ValidationIssue[] {
     }
 
     if (isObject(cell.border)) {
-      checkUnknownKeys(cell.border, BORDER_KEYS, `${path}.border`)
+      checkUnknownKeys(cell.border, keys.border, `${path}.border`)
     }
 
     if (Array.isArray(cell.blocks)) {
@@ -271,7 +183,7 @@ export function validateDocumentIntegrity(doc: unknown): ValidationIssue[] {
 
     switch (bType) {
       case 'paragraph': {
-        checkUnknownKeys(block, PARAGRAPH_BLOCK_KEYS, path)
+        checkUnknownKeys(block, keys.paragraphBlock, path)
         if (typeof block.style === 'string') {
           if (!documentStyles || !Object.hasOwn(documentStyles, block.style)) {
             issues.push({
@@ -290,18 +202,18 @@ export function validateDocumentIntegrity(doc: unknown): ValidationIssue[] {
         break
       }
       case 'image': {
-        checkUnknownKeys(block, IMAGE_BLOCK_KEYS, path)
+        checkUnknownKeys(block, keys.imageBlock, path)
         if (isObject(block.anchor)) {
-          checkUnknownKeys(block.anchor, IMAGE_ANCHOR_KEYS, `${path}.anchor`)
+          checkUnknownKeys(block.anchor, keys.imageAnchor, `${path}.anchor`)
         }
         break
       }
       case 'table': {
-        checkUnknownKeys(block, TABLE_BLOCK_KEYS, path)
+        checkUnknownKeys(block, keys.tableBlock, path)
         if (Array.isArray(block.columns)) {
           block.columns.forEach((col, cIdx) => {
             if (isObject(col)) {
-              checkUnknownKeys(col, TABLE_COLUMN_KEYS, `${path}.columns[${cIdx}]`)
+              checkUnknownKeys(col, keys.tableColumn, `${path}.columns[${cIdx}]`)
             }
           })
         }
@@ -326,22 +238,22 @@ export function validateDocumentIntegrity(doc: unknown): ValidationIssue[] {
             }
           })
         } else if (isObject(block.rows)) {
-          checkUnknownKeys(block.rows, TABLE_EACH_ROWS_KEYS, `${path}.rows`)
+          checkUnknownKeys(block.rows, keys.tableEachRows, `${path}.rows`)
           if (Array.isArray(block.rows.cells)) {
             block.rows.cells.forEach((c, cIdx) => validateCell(c, `${path}.rows.cells[${cIdx}]`))
           }
         }
         if (isObject(block.border)) {
-          checkUnknownKeys(block.border, BORDER_KEYS, `${path}.border`)
+          checkUnknownKeys(block.border, keys.border, `${path}.border`)
         }
         break
       }
       case 'columns': {
-        checkUnknownKeys(block, COLUMNS_BLOCK_KEYS, path)
+        checkUnknownKeys(block, keys.columnsBlock, path)
         if (Array.isArray(block.columns)) {
           block.columns.forEach((col, cIdx) => {
             if (isObject(col)) {
-              checkUnknownKeys(col, COLUMNS_COL_KEYS, `${path}.columns[${cIdx}]`)
+              checkUnknownKeys(col, keys.columnsCol, `${path}.columns[${cIdx}]`)
               if (Array.isArray(col.blocks)) {
                 col.blocks.forEach((cb, bIdx) => {
                   validateBlock(cb, `${path}.columns[${cIdx}].blocks[${bIdx}]`)
@@ -353,26 +265,26 @@ export function validateDocumentIntegrity(doc: unknown): ValidationIssue[] {
         break
       }
       case 'signature': {
-        checkUnknownKeys(block, SIGNATURE_BLOCK_KEYS, path)
+        checkUnknownKeys(block, keys.signatureBlock, path)
         break
       }
       case 'spacer': {
-        checkUnknownKeys(block, SPACER_BLOCK_KEYS, path)
+        checkUnknownKeys(block, keys.spacerBlock, path)
         if (isObject(block.height)) {
-          checkUnknownKeys(block.height, SPACER_HEIGHT_OBJ_KEYS, `${path}.height`)
+          checkUnknownKeys(block.height, keys.spacerHeightObj, `${path}.height`)
         }
         break
       }
       case 'line': {
-        checkUnknownKeys(block, LINE_BLOCK_KEYS, path)
+        checkUnknownKeys(block, keys.lineBlock, path)
         break
       }
       case 'pageBreak': {
-        checkUnknownKeys(block, PAGE_BREAK_BLOCK_KEYS, path)
+        checkUnknownKeys(block, keys.pageBreakBlock, path)
         break
       }
       case 'each': {
-        checkUnknownKeys(block, EACH_BLOCK_KEYS, path)
+        checkUnknownKeys(block, keys.eachBlock, path)
         if (Array.isArray(block.blocks)) {
           block.blocks.forEach((eb, bIdx) => {
             validateBlock(eb, `${path}.blocks[${bIdx}]`)
@@ -381,7 +293,7 @@ export function validateDocumentIntegrity(doc: unknown): ValidationIssue[] {
         break
       }
       case 'if': {
-        checkUnknownKeys(block, IF_BLOCK_KEYS, path)
+        checkUnknownKeys(block, keys.ifBlock, path)
         if (Array.isArray(block.then)) {
           block.then.forEach((tb, bIdx) => {
             validateBlock(tb, `${path}.then[${bIdx}]`)

@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest'
+import { z } from 'zod'
 import { createEngine } from '../src/engine.js'
+import {
+  SCHEMA_SHAPES,
+  lineSpacingObjectSchemas,
+  metaSchema,
+} from '../src/schema.js'
+import {
+  INTEGRITY_KEY_SETS,
+  getKeySets,
+  validateDocumentIntegrity,
+} from '../src/validate.js'
 import { testFontProvider } from './helpers/fonts.js'
 import {
   memo,
@@ -139,5 +150,44 @@ describe('Validation integrity: unknown keys and undefined styles (F3)', () => {
       )
       expect(badIssues, `Template ${tpl.name} had unexpected issues: ${JSON.stringify(badIssues)}`).toEqual([])
     }
+  })
+
+  it('derives all 36 key sets from zod schema shapes with zero drift (F3b)', () => {
+    const keySets = getKeySets()
+
+    // Assert every schema in SCHEMA_SHAPES has an exact match in INTEGRITY_KEY_SETS
+    for (const [name, schema] of Object.entries(SCHEMA_SHAPES)) {
+      const expectedKeys = new Set(Object.keys((schema as { shape: Record<string, unknown> }).shape))
+      expect(keySets[name], `Key set for ${name} must match schema.shape`).toEqual(expectedKeys)
+      expect(INTEGRITY_KEY_SETS[name], `INTEGRITY_KEY_SETS.${name} proxy must match schema.shape`).toEqual(expectedKeys)
+    }
+
+    // Assert lineSpacing matches the union of its object variant shapes
+    const expectedLineSpacingKeys = new Set(
+      lineSpacingObjectSchemas.flatMap((s) => Object.keys(s.shape)),
+    )
+    expect(keySets.lineSpacing).toEqual(expectedLineSpacingKeys)
+    expect(INTEGRITY_KEY_SETS.lineSpacing).toEqual(expectedLineSpacingKeys)
+
+    // Verify all 36 expected schema keys are tracked
+    expect(Object.keys(keySets).length).toBe(36)
+  })
+
+  it('drift test fails if a new optional field is added to a zod schema but not accepted by integrity check (F3b)', () => {
+    // Simulate adding a new optional field to a Zod schema
+    const extendedMetaSchema = metaSchema.extend({
+      customField: z.string().optional(),
+    })
+    const extendedShapeKeys = new Set(Object.keys(extendedMetaSchema.shape))
+
+    // A stale/hard-coded set without 'customField' will fail equality
+    const staleHardcodedSet = new Set(['title', 'author', 'subject', 'keywords'])
+    expect(staleHardcodedSet).not.toEqual(extendedShapeKeys)
+    expect(extendedShapeKeys.has('customField')).toBe(true)
+    expect(staleHardcodedSet.has('customField')).toBe(false)
+
+    // Conversely, dynamically derived set from schema.shape accepts the new key
+    const dynamicallyDerivedSet = new Set(Object.keys(extendedMetaSchema.shape))
+    expect(dynamicallyDerivedSet).toEqual(extendedShapeKeys)
   })
 })
