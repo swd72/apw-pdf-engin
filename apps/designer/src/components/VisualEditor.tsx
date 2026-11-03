@@ -1,4 +1,10 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import type { DocumentDef } from '@apw-pdf/core'
 import type { RenderClient } from '@apw-pdf/react'
 import { useEditorState } from '../editor/useEditorState.js'
@@ -57,6 +63,24 @@ const IDLE_STAGE_CLIENT: RenderClient = {
   dispose: () => {},
 }
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!target || !(target instanceof HTMLElement)) return false
+  const tag = target.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+    return true
+  }
+  if (target.isContentEditable) {
+    return true
+  }
+  if (typeof target.closest === 'function') {
+    const ce = target.closest('[contenteditable]') as HTMLElement | null
+    if (ce && ce.getAttribute('contenteditable') !== 'false') {
+      return true
+    }
+  }
+  return false
+}
+
 export function VisualEditor({
   doc,
   data,
@@ -90,6 +114,31 @@ export function VisualEditor({
   const [warningsExpanded, setWarningsExpanded] = useState(false)
   const [jsonModePathKey, setJsonModePathKey] = useState<string | null>(null)
   const rightPanelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+      if (isEditableTarget(e.target)) return
+
+      const key = e.key.toLowerCase()
+      if (key === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) {
+          state.redo()
+        } else {
+          state.undo()
+        }
+      } else if (key === 'y' && !e.shiftKey) {
+        e.preventDefault()
+        state.redo()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [state.undo, state.redo])
 
   const selectedPathKey = state.selectedPath ? state.selectedPath.join('.') : ''
   const isBlockJsonMode =
@@ -175,6 +224,7 @@ export function VisualEditor({
       client={effectiveStageClient}
       editor={state}
       onEditJson={handleEditBlockJson}
+      onFocusProperties={handleFocusProperties}
     />
   )
 

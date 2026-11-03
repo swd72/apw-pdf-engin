@@ -279,6 +279,24 @@ export function GuidesIcon(props: IconProps = {}) {
   )
 }
 
+export function UndoIcon(props: IconProps = {}) {
+  return (
+    <Svg {...props}>
+      <path d="M7 5.5L3.5 9l3.5 3.5" />
+      <path d="M4 9h7.5a4 4 0 1 1 0 8H9" />
+    </Svg>
+  )
+}
+
+export function RedoIcon(props: IconProps = {}) {
+  return (
+    <Svg {...props}>
+      <path d="M13 5.5L16.5 9 13 12.5" />
+      <path d="M16 9H8.5a4 4 0 1 0 0 8H11" />
+    </Svg>
+  )
+}
+
 export const text = TextIcon
 export const table = TableIcon
 export const columns = ColumnsIcon
@@ -304,6 +322,9 @@ export const chevronRight = ChevronRightIcon
 export const reset = ResetIcon
 export const braces = BracesIcon
 export const settings = SettingsIcon
+export const guides = GuidesIcon
+export const undo = UndoIcon
+export const redo = RedoIcon
 
 export const icons = {
   text: TextIcon,
@@ -331,4 +352,7 @@ export const icons = {
   reset: ResetIcon,
   braces: BracesIcon,
   settings: SettingsIcon,
+  guides: GuidesIcon,
+  undo: UndoIcon,
+  redo: RedoIcon,
 }

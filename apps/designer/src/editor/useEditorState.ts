@@ -15,6 +15,7 @@ import {
 } from './docModel.js'
 import { BLOCK_TYPES } from './blockCatalog.js'
 import { unresolved, type Binding } from './bindings.js'
+import { createHistory } from './history.js'
 
 export interface EditorState {
   doc: DocumentDef
@@ -31,6 +32,10 @@ export interface EditorState {
   updateBlock(path: BlockPath, patch: Record<string, unknown>): void
   replaceBlock(path: BlockPath, block: Block): void
   setData(next: unknown): void
+  undo(): void
+  redo(): void
+  canUndo: boolean
+  canRedo: boolean
   warnings: Binding[]
 }
 
@@ -75,23 +80,71 @@ export function useEditorState(
   const [doc, setDoc] = useState<DocumentDef>(initial.doc)
   const [data, setDataState] = useState<unknown>(initial.data)
   const [selectedPath, setSelectedPathState] = useState<BlockPath | null>(null)
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
+
+  const docRef = useRef<DocumentDef>(initial.doc)
+  const dataRef = useRef<unknown>(initial.data)
   const selectedPathRef = useRef<BlockPath | null>(null)
+  const historyRef = useRef(createHistory())
 
   const setSelectedPath = useCallback((next: BlockPath | null) => {
     selectedPathRef.current = next
     setSelectedPathState(next)
   }, [])
 
+  const syncHistoryFlags = useCallback(() => {
+    const nextUndo = historyRef.current.canUndo()
+    const nextRedo = historyRef.current.canRedo()
+    setCanUndo((prev) => (prev === nextUndo ? prev : nextUndo))
+    setCanRedo((prev) => (prev === nextRedo ? prev : nextRedo))
+  }, [])
+
+  const commit = useCallback(
+    (nextDoc: DocumentDef, nextData: unknown, mergeKey?: string) => {
+      const prevDoc = docRef.current
+      const prevData = dataRef.current
+      if (nextDoc === prevDoc && nextData === prevData) return
+      historyRef.current.push({ doc: prevDoc, data: prevData }, mergeKey)
+      docRef.current = nextDoc
+      dataRef.current = nextData
+      setDoc(nextDoc)
+      setDataState(nextData)
+      syncHistoryFlags()
+      onChange({ doc: nextDoc, data: nextData })
+    },
+    [onChange, syncHistoryFlags],
+  )
+
   const initialRef = useRef(initial)
   useEffect(() => {
-    if (initial.doc !== initialRef.current.doc && initial.doc !== doc) {
+    let resynced = false
+    if (
+      initial.doc !== initialRef.current.doc &&
+      initial.doc !== docRef.current
+    ) {
+      docRef.current = initial.doc
       setDoc(initial.doc)
+      resynced = true
     }
-    if (initial.data !== initialRef.current.data && initial.data !== data) {
+    if (
+      initial.data !== initialRef.current.data &&
+      initial.data !== dataRef.current
+    ) {
+      dataRef.current = initial.data
       setDataState(initial.data)
+      resynced = true
+    }
+    if (resynced) {
+      historyRef.current.reset()
+      syncHistoryFlags()
+      const activePath = selectedPathRef.current
+      if (activePath && !getBlock(docRef.current, activePath)) {
+        setSelectedPath(null)
+      }
     }
     initialRef.current = initial
-  }, [initial.doc, initial.data, doc, data])
+  }, [initial.doc, initial.data, setSelectedPath, syncHistoryFlags])
 
   const warnings = useMemo(() => unresolved(doc, data), [doc, data])
 
@@ -101,14 +154,14 @@ export function useEditorState(
         setSelectedPath(null)
         return
       }
-      const block = getBlock(doc, path)
+      const block = getBlock(docRef.current, path)
       if (block) {
         setSelectedPath(path)
       } else {
         setSelectedPath(null)
       }
     },
-    [doc],
+    [setSelectedPath],
   )
 
   const addBlock = useCallback(
@@ -118,15 +171,15 @@ export function useEditorState(
         ? descriptor.create()
         : ({ type, text: '' } as unknown as Block)
 
-      const nextDoc = insertBlock(doc, listPath, index, block)
-      if (nextDoc !== doc) {
-        setDoc(nextDoc)
+      const currentDoc = docRef.current
+      const nextDoc = insertBlock(currentDoc, listPath, index, block)
+      if (nextDoc !== currentDoc) {
         const newPath: BlockPath = [...listPath, index]
         setSelectedPath(newPath)
-        onChange({ doc: nextDoc, data })
+        commit(nextDoc, dataRef.current)
       }
     },
-    [doc, data, onChange],
+    [commit, setSelectedPath],
   )
 
   const removeSelected = useCallback(() => {
@@ -136,17 +189,16 @@ export function useEditorState(
     const index = activePath[activePath.length - 1]
     if (typeof index !== 'number') return
 
-    const nextDoc = removeBlock(doc, activePath)
-    if (nextDoc !== doc) {
-      setDoc(nextDoc)
-
+    const currentDoc = docRef.current
+    const nextDoc = removeBlock(currentDoc, activePath)
+    if (nextDoc !== currentDoc) {
       if (index > 0) {
         setSelectedPath([...parentListPath, index - 1])
       } else {
         let parentBlockPath: BlockPath | null = null
         for (let k = activePath.length - 1; k >= 1; k--) {
           const sub = activePath.slice(0, k)
-          if (getBlock(doc, sub)) {
+          if (getBlock(currentDoc, sub)) {
             parentBlockPath = sub
             break
           }
@@ -154,9 +206,9 @@ export function useEditorState(
         setSelectedPath(parentBlockPath)
       }
 
-      onChange({ doc: nextDoc, data })
+      commit(nextDoc, dataRef.current)
     }
-  }, [doc, data, selectedPath, setSelectedPath, onChange])
+  }, [selectedPath, setSelectedPath, commit])
 
   const moveSelected = useCallback(
     (delta: -1 | 1) => {
@@ -166,66 +218,70 @@ export function useEditorState(
       const index = activePath[activePath.length - 1]
       if (typeof index !== 'number') return
 
-      const nextDoc = moveBlock(doc, activePath, delta)
-      if (nextDoc !== doc) {
-        setDoc(nextDoc)
+      const currentDoc = docRef.current
+      const nextDoc = moveBlock(currentDoc, activePath, delta)
+      if (nextDoc !== currentDoc) {
         setSelectedPath([...parentListPath, index + delta])
-        onChange({ doc: nextDoc, data })
+        commit(nextDoc, dataRef.current)
       }
     },
-    [doc, data, selectedPath, setSelectedPath, onChange],
+    [selectedPath, setSelectedPath, commit],
   )
 
   const moveSelectedInto = useCallback(
     (targetListPath: BlockPath) => {
       const activePath = selectedPathRef.current ?? selectedPath
-      if (!activePath || !canMoveInto(doc, activePath, targetListPath)) return
-      const nextDoc = moveInto(doc, activePath, targetListPath)
-      if (nextDoc !== doc) {
-        setDoc(nextDoc)
+      const currentDoc = docRef.current
+      if (!activePath || !canMoveInto(currentDoc, activePath, targetListPath)) {
+        return
+      }
+      const nextDoc = moveInto(currentDoc, activePath, targetListPath)
+      if (nextDoc !== currentDoc) {
         const targetList = getIn(nextDoc, targetListPath) as Block[]
         const newIdx = Array.isArray(targetList) ? targetList.length - 1 : 0
         setSelectedPath([...targetListPath, newIdx])
-        onChange({ doc: nextDoc, data })
+        commit(nextDoc, dataRef.current)
       }
     },
-    [doc, data, selectedPath, setSelectedPath, onChange],
+    [selectedPath, setSelectedPath, commit],
   )
 
   const moveSelectedOut = useCallback(() => {
     const activePath = selectedPathRef.current ?? selectedPath
     if (!activePath || activePath.length === 0) return
-    const nextDoc = moveOut(doc, activePath)
-    if (nextDoc !== doc) {
-      setDoc(nextDoc)
+    const currentDoc = docRef.current
+    const nextDoc = moveOut(currentDoc, activePath)
+    if (nextDoc !== currentDoc) {
       let parentBlockPath: BlockPath | null = null
       for (let k = activePath.length - 1; k >= 1; k--) {
         const sub = activePath.slice(0, k)
-        if (getBlock(doc, sub)) {
+        if (getBlock(currentDoc, sub)) {
           parentBlockPath = sub
           break
         }
       }
       if (parentBlockPath) {
         const parentListPath = parentBlockPath.slice(0, -1)
-        const parentIndex = parentBlockPath[parentBlockPath.length - 1] as number
+        const parentIndex = parentBlockPath[
+          parentBlockPath.length - 1
+        ] as number
         setSelectedPath([...parentListPath, parentIndex + 1])
       }
-      onChange({ doc: nextDoc, data })
+      commit(nextDoc, dataRef.current)
     }
-  }, [doc, data, selectedPath, setSelectedPath, onChange])
+  }, [selectedPath, setSelectedPath, commit])
 
   const moveBlockTo = useCallback(
     (from: BlockPath, toListPath: BlockPath, index: number) => {
-      const nextDoc = moveBlockToDoc(doc, from, toListPath, index)
-      if (nextDoc !== doc) {
-        setDoc(nextDoc)
+      const currentDoc = docRef.current
+      const nextDoc = moveBlockToDoc(currentDoc, from, toListPath, index)
+      if (nextDoc !== currentDoc) {
         const adjustedTarget = adjustPathAfterRemoval(from, toListPath)
         setSelectedPath([...adjustedTarget, index])
-        onChange({ doc: nextDoc, data })
+        commit(nextDoc, dataRef.current)
       }
     },
-    [doc, data, setSelectedPath, onChange],
+    [setSelectedPath, commit],
   )
 
   const duplicateSelected = useCallback(() => {
@@ -235,42 +291,77 @@ export function useEditorState(
     const index = activePath[activePath.length - 1]
     if (typeof index !== 'number') return
 
-    const nextDoc = duplicateBlock(doc, activePath)
-    if (nextDoc !== doc) {
-      setDoc(nextDoc)
+    const currentDoc = docRef.current
+    const nextDoc = duplicateBlock(currentDoc, activePath)
+    if (nextDoc !== currentDoc) {
       setSelectedPath([...parentListPath, index + 1])
-      onChange({ doc: nextDoc, data })
+      commit(nextDoc, dataRef.current)
     }
-  }, [doc, data, selectedPath, setSelectedPath, onChange])
+  }, [selectedPath, setSelectedPath, commit])
 
   const replaceBlock = useCallback(
     (path: BlockPath, block: Block) => {
-      const nextDoc = updateIn(doc, path, () => block) as DocumentDef
-      if (nextDoc !== doc) {
-        setDoc(nextDoc)
-        onChange({ doc: nextDoc, data })
+      const currentDoc = docRef.current
+      const nextDoc = updateIn(currentDoc, path, () => block) as DocumentDef
+      if (nextDoc !== currentDoc) {
+        commit(nextDoc, dataRef.current, `block:${path.join('.')}`)
       }
     },
-    [doc, data, onChange],
+    [commit],
   )
 
   const updateBlock = useCallback(
     (path: BlockPath, patch: Record<string, unknown>) => {
-      const current = getBlock(doc, path)
+      const current = getBlock(docRef.current, path)
       if (!current) return
       const nextBlock = { ...current, ...patch } as Block
       replaceBlock(path, nextBlock)
     },
-    [doc, replaceBlock],
+    [replaceBlock],
   )
 
   const setData = useCallback(
     (next: unknown) => {
-      setDataState(next)
-      onChange({ doc, data: next })
+      commit(docRef.current, next, 'data')
     },
-    [doc, onChange],
+    [commit],
   )
+
+  const undo = useCallback(() => {
+    const restored = historyRef.current.undo({
+      doc: docRef.current,
+      data: dataRef.current,
+    })
+    if (!restored) return
+    docRef.current = restored.doc
+    dataRef.current = restored.data
+    setDoc(restored.doc)
+    setDataState(restored.data)
+    const activePath = selectedPathRef.current
+    if (activePath && !getBlock(restored.doc, activePath)) {
+      setSelectedPath(null)
+    }
+    syncHistoryFlags()
+    onChange({ doc: restored.doc, data: restored.data })
+  }, [onChange, setSelectedPath, syncHistoryFlags])
+
+  const redo = useCallback(() => {
+    const restored = historyRef.current.redo({
+      doc: docRef.current,
+      data: dataRef.current,
+    })
+    if (!restored) return
+    docRef.current = restored.doc
+    dataRef.current = restored.data
+    setDoc(restored.doc)
+    setDataState(restored.data)
+    const activePath = selectedPathRef.current
+    if (activePath && !getBlock(restored.doc, activePath)) {
+      setSelectedPath(null)
+    }
+    syncHistoryFlags()
+    onChange({ doc: restored.doc, data: restored.data })
+  }, [onChange, setSelectedPath, syncHistoryFlags])
 
   return {
     doc,
@@ -287,6 +378,10 @@ export function useEditorState(
     updateBlock,
     replaceBlock,
     setData,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
     warnings,
   }
 }

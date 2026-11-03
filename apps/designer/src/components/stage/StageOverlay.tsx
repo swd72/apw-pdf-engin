@@ -6,6 +6,12 @@ import { blockMeta } from '../cards/blockMeta.js'
 import { pathKey, resolveSelection } from './sourcePath.js'
 import { hitOrder, scaleRect } from './overlayGeometry.js'
 import { FloatingToolbar } from './FloatingToolbar.js'
+import {
+  InlineTextEditor,
+  commitEditTarget,
+  editTarget,
+  type EditTarget,
+} from './InlineTextEditor.js'
 
 export interface StageOverlayProps {
   pageIndex: number
@@ -16,6 +22,7 @@ export interface StageOverlayProps {
   showToolbar?: boolean
   editing?: boolean
   onEditJson?(path: BlockPath): void
+  onFocusProperties?(): void
   onSelectFromOverlay?(path: BlockPath | null): void
 }
 
@@ -28,9 +35,16 @@ export function StageOverlay({
   showToolbar = true,
   editing = false,
   onEditJson,
+  onFocusProperties,
   onSelectFromOverlay,
 }: StageOverlayProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const [editingState, setEditingState] = useState<{
+    target: EditTarget
+    box: BlockBox
+  } | null>(null)
+
+  const isEditing = editing || editingState !== null
 
   const selectedKey = pathKey(editor.selectedPath)
 
@@ -69,9 +83,39 @@ export function StageOverlay({
     <div
       className="stage-overlay"
       data-page-index={pageIndex}
+      tabIndex={-1}
       onClick={() => {
         onSelectFromOverlay?.(null)
         editor.select(null)
+      }}
+      onKeyDown={(e) => {
+        if (isEditing) return
+        const targetEl = e.target as HTMLElement | null
+        if (
+          targetEl &&
+          (targetEl.tagName === 'INPUT' ||
+            targetEl.tagName === 'TEXTAREA' ||
+            targetEl.tagName === 'SELECT')
+        ) {
+          return
+        }
+        if (
+          e.key === 'Enter' &&
+          !e.ctrlKey &&
+          !e.metaKey &&
+          !e.altKey &&
+          editor.selectedPath
+        ) {
+          e.preventDefault()
+          const target = editTarget(editor.doc, {
+            blockPath: editor.selectedPath,
+          })
+          if (target && firstSelectedBox) {
+            setEditingState({ target, box: firstSelectedBox.box })
+          } else {
+            onFocusProperties?.()
+          }
+        }
       }}
     >
       {showGuides && (
@@ -130,19 +174,46 @@ export function StageOverlay({
               onSelectFromOverlay?.(resolved.blockPath)
               editor.select(resolved.blockPath)
             }}
+            onDoubleClick={(e) => {
+              e.stopPropagation()
+              onSelectFromOverlay?.(resolved.blockPath)
+              editor.select(resolved.blockPath)
+              const target = editTarget(editor.doc, resolved)
+              if (target) {
+                setEditingState({ target, box })
+              } else {
+                onFocusProperties?.()
+              }
+            }}
           >
             {isHovered && <span className="stage-box__badge">{label}</span>}
           </div>
         )
       })}
 
-      {showToolbar && !editing && firstSelectedBox && scaledSelectedBox && (
+      {showToolbar && !isEditing && firstSelectedBox && scaledSelectedBox && (
         <FloatingToolbar
           editor={editor}
           path={firstSelectedBox.blockPath}
           box={scaledSelectedBox}
           stage={stageSize}
           onEditJson={onEditJson}
+        />
+      )}
+
+      {editingState && (
+        <InlineTextEditor
+          editor={editor}
+          target={editingState.target}
+          box={scaleRect(editingState.box, scale)}
+          scale={scale}
+          onCommit={(nextText) => {
+            commitEditTarget(editor, editingState.target, nextText)
+            setEditingState(null)
+          }}
+          onCancel={() => {
+            setEditingState(null)
+          }}
         />
       )}
     </div>

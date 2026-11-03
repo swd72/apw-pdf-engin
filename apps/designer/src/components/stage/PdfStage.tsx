@@ -22,6 +22,8 @@ import {
   FitWidthIcon,
   DownloadIcon,
   GuidesIcon,
+  UndoIcon,
+  RedoIcon,
 } from '../../ui/icons.js'
 import {
   PREVIEW_ASSETS,
@@ -69,6 +71,7 @@ export interface PdfStageProps {
   client?: RenderClient
   editor?: EditorState
   onEditJson?(path: BlockPath): void
+  onFocusProperties?(): void
 }
 
 export function PdfStage({
@@ -78,6 +81,7 @@ export function PdfStage({
   client,
   editor,
   onEditJson,
+  onFocusProperties,
 }: PdfStageProps) {
   const { effectiveDoc, effectiveData } = useLastGoodPreview(doc, data)
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -336,6 +340,7 @@ export function PdfStage({
           showGuides={showGuides}
           showToolbar={pageIndex === firstSelectedPageIndex}
           onEditJson={onEditJson}
+          onFocusProperties={onFocusProperties}
           onSelectFromOverlay={handleSelectFromOverlay}
         />
       ) as ReturnType<NonNullable<PdfPreviewProps['renderOverlay']>>
@@ -346,6 +351,7 @@ export function PdfStage({
       showGuides,
       firstSelectedPageIndex,
       onEditJson,
+      onFocusProperties,
       handleSelectFromOverlay,
     ],
   )
@@ -444,6 +450,21 @@ export function PdfStage({
           aria-label="แถบเครื่องมือตัวอย่าง PDF"
           className="pdf-stage__toolbar"
         >
+          <IconButton
+            label="ย้อนกลับ"
+            icon={<UndoIcon />}
+            disabled={!editor?.canUndo}
+            onClick={() => editor?.undo()}
+          />
+          <IconButton
+            label="ทำซ้ำ"
+            icon={<RedoIcon />}
+            disabled={!editor?.canRedo}
+            onClick={() => editor?.redo()}
+          />
+
+          <span className="pdf-stage__divider" aria-hidden="true" />
+
           <IconButton
             label="ซูมออก"
             icon={<MinusIcon />}
