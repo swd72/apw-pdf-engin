@@ -5,6 +5,8 @@ import {
   insertBlock,
   removeBlock,
   moveBlock,
+  moveBlockTo as moveBlockToDoc,
+  adjustPathAfterRemoval,
   canMoveInto,
   moveInto,
   moveOut,
@@ -24,6 +26,7 @@ export interface EditorState {
   moveSelected(delta: -1 | 1): void
   moveSelectedInto(targetListPath: BlockPath): void
   moveSelectedOut(): void
+  moveBlockTo(from: BlockPath, toListPath: BlockPath, index: number): void
   duplicateSelected(): void
   updateBlock(path: BlockPath, patch: Record<string, unknown>): void
   replaceBlock(path: BlockPath, block: Block): void
@@ -71,7 +74,13 @@ export function useEditorState(
 ): EditorState {
   const [doc, setDoc] = useState<DocumentDef>(initial.doc)
   const [data, setDataState] = useState<unknown>(initial.data)
-  const [selectedPath, setSelectedPath] = useState<BlockPath | null>(null)
+  const [selectedPath, setSelectedPathState] = useState<BlockPath | null>(null)
+  const selectedPathRef = useRef<BlockPath | null>(null)
+
+  const setSelectedPath = useCallback((next: BlockPath | null) => {
+    selectedPathRef.current = next
+    setSelectedPathState(next)
+  }, [])
 
   const initialRef = useRef(initial)
   useEffect(() => {
@@ -121,12 +130,13 @@ export function useEditorState(
   )
 
   const removeSelected = useCallback(() => {
-    if (!selectedPath || selectedPath.length === 0) return
-    const parentListPath = selectedPath.slice(0, -1)
-    const index = selectedPath[selectedPath.length - 1]
+    const activePath = selectedPathRef.current ?? selectedPath
+    if (!activePath || activePath.length === 0) return
+    const parentListPath = activePath.slice(0, -1)
+    const index = activePath[activePath.length - 1]
     if (typeof index !== 'number') return
 
-    const nextDoc = removeBlock(doc, selectedPath)
+    const nextDoc = removeBlock(doc, activePath)
     if (nextDoc !== doc) {
       setDoc(nextDoc)
 
@@ -134,8 +144,8 @@ export function useEditorState(
         setSelectedPath([...parentListPath, index - 1])
       } else {
         let parentBlockPath: BlockPath | null = null
-        for (let k = selectedPath.length - 1; k >= 1; k--) {
-          const sub = selectedPath.slice(0, k)
+        for (let k = activePath.length - 1; k >= 1; k--) {
+          const sub = activePath.slice(0, k)
           if (getBlock(doc, sub)) {
             parentBlockPath = sub
             break
@@ -146,29 +156,31 @@ export function useEditorState(
 
       onChange({ doc: nextDoc, data })
     }
-  }, [doc, data, selectedPath, onChange])
+  }, [doc, data, selectedPath, setSelectedPath, onChange])
 
   const moveSelected = useCallback(
     (delta: -1 | 1) => {
-      if (!selectedPath || selectedPath.length === 0) return
-      const parentListPath = selectedPath.slice(0, -1)
-      const index = selectedPath[selectedPath.length - 1]
+      const activePath = selectedPathRef.current ?? selectedPath
+      if (!activePath || activePath.length === 0) return
+      const parentListPath = activePath.slice(0, -1)
+      const index = activePath[activePath.length - 1]
       if (typeof index !== 'number') return
 
-      const nextDoc = moveBlock(doc, selectedPath, delta)
+      const nextDoc = moveBlock(doc, activePath, delta)
       if (nextDoc !== doc) {
         setDoc(nextDoc)
         setSelectedPath([...parentListPath, index + delta])
         onChange({ doc: nextDoc, data })
       }
     },
-    [doc, data, selectedPath, onChange],
+    [doc, data, selectedPath, setSelectedPath, onChange],
   )
 
   const moveSelectedInto = useCallback(
     (targetListPath: BlockPath) => {
-      if (!selectedPath || !canMoveInto(doc, selectedPath, targetListPath)) return
-      const nextDoc = moveInto(doc, selectedPath, targetListPath)
+      const activePath = selectedPathRef.current ?? selectedPath
+      if (!activePath || !canMoveInto(doc, activePath, targetListPath)) return
+      const nextDoc = moveInto(doc, activePath, targetListPath)
       if (nextDoc !== doc) {
         setDoc(nextDoc)
         const targetList = getIn(nextDoc, targetListPath) as Block[]
@@ -177,17 +189,18 @@ export function useEditorState(
         onChange({ doc: nextDoc, data })
       }
     },
-    [doc, data, selectedPath, onChange],
+    [doc, data, selectedPath, setSelectedPath, onChange],
   )
 
   const moveSelectedOut = useCallback(() => {
-    if (!selectedPath || selectedPath.length === 0) return
-    const nextDoc = moveOut(doc, selectedPath)
+    const activePath = selectedPathRef.current ?? selectedPath
+    if (!activePath || activePath.length === 0) return
+    const nextDoc = moveOut(doc, activePath)
     if (nextDoc !== doc) {
       setDoc(nextDoc)
       let parentBlockPath: BlockPath | null = null
-      for (let k = selectedPath.length - 1; k >= 1; k--) {
-        const sub = selectedPath.slice(0, k)
+      for (let k = activePath.length - 1; k >= 1; k--) {
+        const sub = activePath.slice(0, k)
         if (getBlock(doc, sub)) {
           parentBlockPath = sub
           break
@@ -200,21 +213,35 @@ export function useEditorState(
       }
       onChange({ doc: nextDoc, data })
     }
-  }, [doc, data, selectedPath, onChange])
+  }, [doc, data, selectedPath, setSelectedPath, onChange])
+
+  const moveBlockTo = useCallback(
+    (from: BlockPath, toListPath: BlockPath, index: number) => {
+      const nextDoc = moveBlockToDoc(doc, from, toListPath, index)
+      if (nextDoc !== doc) {
+        setDoc(nextDoc)
+        const adjustedTarget = adjustPathAfterRemoval(from, toListPath)
+        setSelectedPath([...adjustedTarget, index])
+        onChange({ doc: nextDoc, data })
+      }
+    },
+    [doc, data, setSelectedPath, onChange],
+  )
 
   const duplicateSelected = useCallback(() => {
-    if (!selectedPath || selectedPath.length === 0) return
-    const parentListPath = selectedPath.slice(0, -1)
-    const index = selectedPath[selectedPath.length - 1]
+    const activePath = selectedPathRef.current ?? selectedPath
+    if (!activePath || activePath.length === 0) return
+    const parentListPath = activePath.slice(0, -1)
+    const index = activePath[activePath.length - 1]
     if (typeof index !== 'number') return
 
-    const nextDoc = duplicateBlock(doc, selectedPath)
+    const nextDoc = duplicateBlock(doc, activePath)
     if (nextDoc !== doc) {
       setDoc(nextDoc)
       setSelectedPath([...parentListPath, index + 1])
       onChange({ doc: nextDoc, data })
     }
-  }, [doc, data, selectedPath, onChange])
+  }, [doc, data, selectedPath, setSelectedPath, onChange])
 
   const replaceBlock = useCallback(
     (path: BlockPath, block: Block) => {
@@ -255,6 +282,7 @@ export function useEditorState(
     moveSelected,
     moveSelectedInto,
     moveSelectedOut,
+    moveBlockTo,
     duplicateSelected,
     updateBlock,
     replaceBlock,

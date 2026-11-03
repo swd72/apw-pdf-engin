@@ -191,4 +191,28 @@ describe('useEditorState', () => {
       text: 'doc 2',
     })
   })
+
+  it('moveBlockTo reorders and selects the moved block', () => {
+    const p0: ParagraphBlock = { type: 'paragraph', text: 'first' }
+    const p1: ParagraphBlock = { type: 'paragraph', text: 'second' }
+    const doc = createDoc([p0, p1])
+    const data = {}
+    const initial = { doc, data }
+    const onChange = vi.fn()
+
+    const { result } = renderHook(() =>
+      useEditorState(initial, onChange),
+    )
+
+    act(() => {
+      result.current.moveBlockTo(['blocks', 0], ['blocks'], 1)
+    })
+
+    expect(result.current.doc.blocks.map((b) => (b as ParagraphBlock).text)).toEqual([
+      'second',
+      'first',
+    ])
+    expect(result.current.selectedPath).toEqual(['blocks', 1])
+    expect(onChange).toHaveBeenCalledTimes(1)
+  })
 })
