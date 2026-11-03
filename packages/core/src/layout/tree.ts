@@ -51,10 +51,30 @@ export type LayoutItem =
       h: number
     }
 
+export interface Rect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+export interface BlockBox extends Rect {
+  path: string
+}
+
+export interface PageInfo {
+  width: number
+  height: number
+  content: Rect
+  boxes: BlockBox[]
+}
+
 export interface LayoutPage {
   width: number
   height: number
   items: LayoutItem[]
+  content: Rect
+  boxes: BlockBox[]
 }
 
 export interface LayoutTree {

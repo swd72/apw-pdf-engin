@@ -6,8 +6,9 @@ import type { ImageProvider } from '../fonts/provider.js'
 import { readImageInfo } from '../images/info.js'
 import { toPt, type pageBox } from '../units.js'
 import type { AnchorTable } from './align.js'
+import { glyphBoxes } from './boxes.js'
 import { layoutParagraph, type LaidLine, type ParagraphLayout } from './paragraph.js'
-import type { LayoutItem, LayoutPage } from './tree.js'
+import type { BlockBox, LayoutItem, LayoutPage, Rect } from './tree.js'
 
 export interface FlowContext {
   fonts: FontRegistry
@@ -444,7 +445,7 @@ export async function paginate(
 ): Promise<LayoutPage[]> {
   const pages: LayoutPage[] = []
   let pageEntries: PlacedPageEntry[] = []
-  let pageAnchoredItems: LayoutItem[] = []
+  let pageAnchoredItems: { item: LayoutItem; path: string }[] = []
   let pageIndex = 0
   let cursorY = ctx.bodyTop(0)
   let atAutoBreakTop = false
@@ -455,14 +456,57 @@ export async function paginate(
   }
 
   function flushCurrentPage(): void {
-    const items: LayoutItem[] = [...pageAnchoredItems]
+    const items: LayoutItem[] = pageAnchoredItems.map((a) => a.item)
     for (const entry of pageEntries) {
       items.push(...entry.frag.items(entry.yTop))
     }
+
+    const topPaths = new Set<string>()
+    const boxes: BlockBox[] = []
+
+    for (const entry of pageEntries) {
+      topPaths.add(entry.frag.path)
+      boxes.push({
+        path: entry.frag.path,
+        x: ctx.box.contentLeft,
+        y: entry.yTop,
+        w: ctx.box.contentWidth,
+        h: entry.frag.height,
+      })
+    }
+
+    for (const anchored of pageAnchoredItems) {
+      if (anchored.item.kind === 'image' || anchored.item.kind === 'rect') {
+        topPaths.add(anchored.path)
+        boxes.push({
+          path: anchored.path,
+          x: anchored.item.x,
+          y: anchored.item.y,
+          w: anchored.item.w,
+          h: anchored.item.h,
+        })
+      }
+    }
+
+    for (const gb of glyphBoxes(items)) {
+      if (!topPaths.has(gb.path)) {
+        boxes.push(gb)
+      }
+    }
+
+    const content: Rect = {
+      x: ctx.box.contentLeft,
+      y: ctx.box.margin.top,
+      w: ctx.box.contentWidth,
+      h: ctx.box.height - ctx.box.margin.top - ctx.box.margin.bottom,
+    }
+
     pages.push({
       width: ctx.box.width,
       height: ctx.box.height,
       items,
+      content,
+      boxes,
     })
     if (pages.length > MAX_PAGES) {
       throw new ApwPdfError('LIMIT_EXCEEDED', `Document exceeds ${MAX_PAGES} page limit`)
@@ -603,13 +647,13 @@ export async function paginate(
   // First layout blocks sequentially so anchors defined in earlier blocks are visible to later blocks
   type FlowStep =
     | { kind: 'pageBreak' }
-    | { kind: 'anchored'; item: LayoutItem }
+    | { kind: 'anchored'; item: LayoutItem; path: string }
     | { kind: 'fragment'; frag: Fragment }
 
   const steps: FlowStep[] = []
   for (let i = 0; i < blocks.length; i++) {
     const b = blocks[i]!
-    const path = `blocks[${i}]`
+    const path = b.$src ?? `blocks[${i}]`
     const res = await layoutBlockToFragment(
       b,
       ctx,
@@ -620,7 +664,7 @@ export async function paginate(
     if (res.pageBreak) {
       steps.push({ kind: 'pageBreak' })
     } else if (res.anchoredItem) {
-      steps.push({ kind: 'anchored', item: res.anchoredItem })
+      steps.push({ kind: 'anchored', item: res.anchoredItem, path })
     } else if (res.fragment) {
       steps.push({ kind: 'fragment', frag: res.fragment })
     }
@@ -636,7 +680,7 @@ export async function paginate(
       continue
     }
     if (step.kind === 'anchored') {
-      pageAnchoredItems.push(step.item)
+      pageAnchoredItems.push({ item: step.item, path: step.path })
       sIdx++
       continue
     }

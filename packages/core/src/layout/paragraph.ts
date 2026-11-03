@@ -1,4 +1,4 @@
-import type { ResolvedParagraph } from '../bind/bind.js'
+import { withBlockMeta, type ResolvedParagraph } from '../bind/bind.js'
 import type { Warning } from '../errors.js'
 import { lineBox, type FontSpec } from '../fonts/metrics.js'
 import type { FontRegistry } from '../fonts/registry.js'
@@ -42,11 +42,15 @@ function mergeParagraphWithStyle(
     return p
   }
   const st = styles[p.style]!
-  return {
-    ...st,
-    ...p,
-    font: st.font || p.font ? { ...st.font, ...p.font } : undefined,
-  }
+  return withBlockMeta(
+    {
+      ...st,
+      ...p,
+      font: st.font || p.font ? { ...st.font, ...p.font } : undefined,
+    },
+    p.$src,
+    p.$inst,
+  )
 }
 
 export async function layoutParagraph(
@@ -122,6 +126,7 @@ export async function layoutParagraph(
   const spacing: LineSpacing = merged.lineSpacing ?? ctx.lineSpacing ?? 'single'
   const align = merged.align ?? 'left'
   const laidLines: LaidLine[] = []
+  const runPath = p.$inst ? `${ctx.path}${p.$inst}` : ctx.path
 
   for (let i = 0; i < brokenLines.length; i++) {
     const bLine = brokenLines[i]!
@@ -158,6 +163,12 @@ export async function layoutParagraph(
       tab: baseTabCtx,
       anchors: lineAnchors,
     })
+
+    if (runPath !== ctx.path) {
+      for (const r of placed.runs) {
+        r.path = runPath
+      }
+    }
 
     laidLines.push({
       height: maxHeight,

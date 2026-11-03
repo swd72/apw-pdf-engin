@@ -1,9 +1,9 @@
 import {
   createEngine,
-
   type Engine,
   type FontProvider,
   type ImageProvider,
+  type PageInfo,
   type Warning,
 } from '@apw-pdf/core'
 import { createSubsetter } from './hbsubset.js'
@@ -12,12 +12,14 @@ import { writePdf } from './writer.js'
 export interface RenderPdfOptions {
   strict?: boolean
   creationDate?: Date
+  boxes?: boolean
 }
 
 export interface RenderPdfResult {
   bytes: Uint8Array
   pageCount: number
   warnings: Warning[]
+  pages?: PageInfo[]
 }
 
 export interface PdfEngine extends Engine {
@@ -71,11 +73,20 @@ export async function createPdfEngine(
         meta: tree.meta,
         creationDate: renderOpts?.creationDate,
       })
-      return {
+      const result: RenderPdfResult = {
         bytes,
         pageCount: tree.pages.length,
         warnings: tree.warnings,
       }
+      if (renderOpts?.boxes) {
+        result.pages = tree.pages.map((p) => ({
+          width: p.width,
+          height: p.height,
+          content: p.content,
+          boxes: p.boxes,
+        }))
+      }
+      return result
     },
   }
 }

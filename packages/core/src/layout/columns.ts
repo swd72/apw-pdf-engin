@@ -1,4 +1,4 @@
-import type { ResolvedColumns } from '../bind/bind.js'
+import { withBlockMeta, type ResolvedColumns } from '../bind/bind.js'
 import { toPt } from '../units.js'
 import {
   layoutBlockToFragment,
@@ -40,9 +40,9 @@ export async function layoutColumns(
       const blk = col.blocks[bIdx]!
       const effectiveBlk =
         isRightAlignedBlock && blk.type === 'paragraph'
-          ? { ...blk, align: 'left' as const }
+          ? withBlockMeta({ ...blk, align: 'left' as const }, blk.$src, blk.$inst)
           : blk
-      const blkPath = `${path}.columns[${i}].blocks[${bIdx}]`
+      const blkPath = blk.$src ?? `${path}.columns[${i}].blocks[${bIdx}]`
       const res = await layoutBlockToFragment(effectiveBlk, ctx, colX, colW, blkPath)
       if (res.fragment) {
         const topOff = currY + (bIdx === 0 ? 0 : res.fragment.spaceBefore)
