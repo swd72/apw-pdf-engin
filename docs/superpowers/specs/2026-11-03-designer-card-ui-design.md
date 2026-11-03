@@ -1,7 +1,7 @@
 # Designer Card UI — Design
 
 Date: 2026-11-03
-Status: Approved in chat by the user ("ok"); replaces the B1 Tree + Inspector UI layer.
+Status: SUPERSEDED by 2026-11-03-designer-playground-ui-design.md (user rejected the card layout).
 Builds on: `2026-11-03-designer-b1-visual-editor-design.md` (logic layer stays).
 
 ## Problem
