@@ -62,7 +62,7 @@ Each preset lists the data keys it uses; inserting it adds missing keys with sam
 ## 5b. Undo / redo
 
 - `useEditorState` keeps a history of `{ doc, data }` snapshots (limit 100). Consecutive `updateBlock` calls on the same path within 600 ms merge into one step, so typing a word is one undo.
-- **Ctrl+Z** undo, **Ctrl+Shift+Z** / **Ctrl+Y** redo, when focus is not inside a text field (text fields keep their native undo). Two icon buttons in the top bar, disabled when unavailable.
+- **Ctrl+Z** undo, **Ctrl+Shift+Z** / **Ctrl+Y** redo, when focus is not inside a text field (text fields keep their native undo). Two icon buttons in the PDF stage toolbar (the editor state lives under the stage, not the app top bar), disabled when unavailable.
 - History resets when another template is opened. Undo restores the selection only if the path still exists.
 
 ## 5c. Margin guides
