@@ -53,8 +53,8 @@ export function PdfPreview({
             viewport,
           }).promise
         }
-      } catch {
-        // Ignore pdfjs canvas render errors in non-canvas test environments (e.g. jsdom)
+      } catch (err) {
+        console.error('[apw-pdf] preview render failed', err)
       }
     })()
 

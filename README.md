@@ -119,6 +119,21 @@ export function MemoScreen() {
 }
 ```
 
+### 5. Template Designer (`apps/designer`)
+
+เว็บแอปสำหรับสร้าง แก้ไข พรีวิวสด และบันทึก JSON PDF templates ในเครื่อง:
+
+```bash
+npx pnpm@9 --filter designer dev
+```
+
+เปิดบราวเซอร์ที่ `http://localhost:5173/` สามารถกำหนดโฟลเดอร์เก็บเทมเพลตผ่านตัวแปรสภาพแวดล้อม `APW_PDF_TEMPLATE_DIR` เพื่อแชร์เทมเพลตร่วมกับ MCP Server ได้:
+
+```bash
+# แชร์โฟลเดอร์เทมเพลตร่วมกับ MCP Server
+APW_PDF_TEMPLATE_DIR="C:/project/apw-pdf-engin/saved-templates" npx pnpm@9 --filter designer dev
+```
+
 ---
 
 ## คู่มือการเขียนเทมเพลต (Template Authoring Guide)
