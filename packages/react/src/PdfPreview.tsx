@@ -18,20 +18,49 @@ export function PdfPreview({
 }: PdfPreviewProps) {
   const { bytes, pageCount, status, error } = usePdf(doc, data, { debounceMs })
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([])
+  const activeRenderTaskRef = useRef<{ cancel: () => void; promise: Promise<unknown> } | null>(null)
+  const activeLoadingTaskRef = useRef<{ destroy: () => Promise<void> } | null>(null)
 
   useEffect(() => {
     if (status !== 'ready' || !bytes || !pageCount) return
     let cancelled = false
+    let currentRenderTask: { cancel: () => void; promise: Promise<unknown> } | null = null
+    let currentLoadingTask: { destroy: () => Promise<void> } | null = null
 
     void (async () => {
+      // Await previous render task cancellation before reusing canvas
+      if (activeRenderTaskRef.current) {
+        try {
+          activeRenderTaskRef.current.cancel()
+        } catch {}
+        try {
+          await activeRenderTaskRef.current.promise
+        } catch (err: any) {
+          if (err?.name !== 'RenderingCancelledException') {
+            // ignore cancellation
+          }
+        }
+      }
+      if (cancelled) return
+
       try {
         const pdfjsLib = await import('pdfjs-dist')
         if (cancelled) return
+
         const loadingTask = pdfjsLib.getDocument({
           data: new Uint8Array(bytes),
           isEvalSupported: false,
         })
-        const pdfDoc = await loadingTask.promise
+        currentLoadingTask = loadingTask
+        activeLoadingTaskRef.current = loadingTask
+
+        let pdfDoc: any
+        try {
+          pdfDoc = await loadingTask.promise
+        } catch (err: any) {
+          if (cancelled || err?.name === 'RenderingCancelledException') return
+          throw err
+        }
         if (cancelled) {
           await pdfDoc.destroy()
           return
@@ -45,21 +74,55 @@ export function PdfPreview({
           if (!ctx) continue
 
           const page = await pdfDoc.getPage(p)
+          if (cancelled) break
+
           const viewport = page.getViewport({ scale })
           canvas.width = Math.round(viewport.width)
           canvas.height = Math.round(viewport.height)
-          await page.render({
+
+          const renderTask = page.render({
             canvasContext: ctx,
             viewport,
-          }).promise
+          })
+          currentRenderTask = renderTask
+          activeRenderTaskRef.current = renderTask
+
+          try {
+            await renderTask.promise
+          } catch (err: any) {
+            if (err?.name === 'RenderingCancelledException') {
+              return
+            }
+            throw err
+          } finally {
+            if (activeRenderTaskRef.current === renderTask) {
+              activeRenderTaskRef.current = null
+            }
+            currentRenderTask = null
+          }
         }
-      } catch (err) {
-        console.error('[apw-pdf] preview render failed', err)
+      } catch (err: any) {
+        if (err?.name !== 'RenderingCancelledException') {
+          console.error('[apw-pdf] preview render failed', err)
+        }
+      } finally {
+        activeLoadingTaskRef.current = null
+        currentLoadingTask = null
       }
     })()
 
     return () => {
       cancelled = true
+      if (currentRenderTask) {
+        try {
+          currentRenderTask.cancel()
+        } catch {}
+      }
+      if (currentLoadingTask) {
+        try {
+          void currentLoadingTask.destroy()
+        } catch {}
+      }
     }
   }, [bytes, pageCount, scale, status])
 
