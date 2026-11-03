@@ -151,6 +151,12 @@ describe('StageOverlay and PdfStage guides/sync', () => {
 
     fireEvent.mouseLeave(firstBox)
     expect(firstBox.classList.contains('stage-box--hover')).toBe(false)
+
+    // Hovering a box inside an each loop shows "<label> · ซ้ำตาม <of>"
+    const loopBox = boxes[1]!
+    fireEvent.mouseEnter(loopBox)
+    expect(loopBox.classList.contains('stage-box--hover')).toBe(true)
+    expect(queryByText('ข้อความ · ซ้ำตาม xs')).not.toBeNull()
   })
 
   it('click selects block', () => {

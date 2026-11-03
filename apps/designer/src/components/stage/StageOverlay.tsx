@@ -8,10 +8,10 @@ import { hitOrder, scaleRect } from './overlayGeometry.js'
 import { FloatingToolbar } from './FloatingToolbar.js'
 import {
   InlineTextEditor,
-  commitEditTarget,
   editTarget,
   type EditTarget,
 } from './InlineTextEditor.js'
+import { innermostEachOf } from './dataSource.js'
 
 export interface StageOverlayProps {
   pageIndex: number
@@ -137,6 +137,8 @@ export function StageOverlay({
         if (!block) return null
 
         const label = blockMeta(block.type).label
+        const loopOf = innermostEachOf(editor.doc, resolved.blockPath)
+        const badgeText = loopOf ? `${label} · ซ้ำตาม ${loopOf}` : label
         const bKey = pathKey(resolved.blockPath)
         const isSelected = Boolean(selectedKey) && bKey === selectedKey
         const isHovered = hoveredIndex === idx
@@ -186,7 +188,7 @@ export function StageOverlay({
               }
             }}
           >
-            {isHovered && <span className="stage-box__badge">{label}</span>}
+            {isHovered && <span className="stage-box__badge">{badgeText}</span>}
           </div>
         )
       })}
@@ -205,10 +207,10 @@ export function StageOverlay({
         <InlineTextEditor
           editor={editor}
           target={editingState.target}
+          inst={editingState.box.inst}
           box={scaleRect(editingState.box, scale)}
           scale={scale}
-          onCommit={(nextText) => {
-            commitEditTarget(editor, editingState.target, nextText)
+          onCommit={() => {
             setEditingState(null)
           }}
           onCancel={() => {

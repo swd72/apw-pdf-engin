@@ -45,6 +45,9 @@ export async function layoutColumns(
       const blkPath = blk.$src ?? `${path}.columns[${i}].blocks[${bIdx}]`
       const res = await layoutBlockToFragment(effectiveBlk, ctx, colX, colW, blkPath)
       if (res.fragment) {
+        if (effectiveBlk.$inst && !res.fragment.inst) {
+          res.fragment.inst = effectiveBlk.$inst
+        }
         const topOff = currY + (bIdx === 0 ? 0 : res.fragment.spaceBefore)
         const frag = res.fragment
         placements.push({ frag, offsetTop: topOff })
@@ -101,6 +104,7 @@ export async function layoutColumns(
     spaceBefore: 0,
     spaceAfter: 0,
     path,
+    ...(c.$inst ? { inst: c.$inst } : {}),
     splittable: false,
     items(yTop: number): LayoutItem[] {
       const out: LayoutItem[] = []

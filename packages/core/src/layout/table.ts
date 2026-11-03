@@ -279,6 +279,9 @@ async function layoutTableSection(
               : cellPath
         const res = await layoutBlockToFragment(blk, ctx, innerX, innerW, blkPath)
         if (res.fragment) {
+          if (blk.$inst && !res.fragment.inst) {
+            res.fragment.inst = blk.$inst
+          }
           const topOff = currOffset + (bIdx === 0 ? 0 : res.fragment.spaceBefore)
           cellFrags.push({ frag: res.fragment, offsetTop: topOff })
           currOffset = topOff + res.fragment.height + res.fragment.spaceAfter
@@ -343,6 +346,7 @@ function makeTableFragment(
   footerSec: LaidSection | null,
   repeatHeader: boolean,
   path: string,
+  inst?: string,
 ): Fragment {
   const headerH = headerSec ? headerSec.totalHeight : 0
   const footerH = footerSec ? footerSec.totalHeight : 0
@@ -369,6 +373,7 @@ function makeTableFragment(
       spaceBefore: 0,
       spaceAfter: 0,
       path,
+      ...(inst !== undefined ? { inst } : {}),
       splittable: false,
       items: renderAll,
       pullTail(_needed: number, canPullAll: boolean) {
@@ -378,7 +383,7 @@ function makeTableFragment(
         return {
           remain: null,
           pulled: {
-            ...makeTableFragment(headerSec, bodySec, footerSec, repeatHeader, path),
+            ...makeTableFragment(headerSec, bodySec, footerSec, repeatHeader, path, this.inst ?? inst),
             keepWithNext: true,
           },
           count: bodySec.rowHeights.length,
@@ -395,15 +400,17 @@ function makeTableFragment(
     spaceAfter: 0,
     minHeadHeight,
     path,
+    ...(inst !== undefined ? { inst } : {}),
     splittable: true,
     items: renderAll,
     pullTail(needed: number, canPullAll: boolean) {
+      const activeInst = this.inst ?? inst
       const nRows = bodySec.rowHeights.length
       if (nRows <= needed && canPullAll) {
         return {
           remain: null,
           pulled: {
-            ...makeTableFragment(headerSec, bodySec, footerSec, repeatHeader, path),
+            ...makeTableFragment(headerSec, bodySec, footerSec, repeatHeader, path, activeInst),
             keepWithNext: true,
           },
           count: nRows,
@@ -415,7 +422,7 @@ function makeTableFragment(
       }
       const headBody = bodySec.sliceRows(0, k)
       const tailBody = bodySec.sliceRows(k, nRows)
-      const headFrag = makeTableFragment(headerSec, headBody, null, repeatHeader, path)
+      const headFrag = makeTableFragment(headerSec, headBody, null, repeatHeader, path, activeInst)
       const tailFrag = {
         ...makeTableFragment(
           repeatHeader ? headerSec : null,
@@ -423,6 +430,7 @@ function makeTableFragment(
           footerSec,
           repeatHeader,
           path,
+          activeInst,
         ),
         keepWithNext: true,
       }
@@ -433,6 +441,7 @@ function makeTableFragment(
       }
     },
     split(avail: number): [Fragment, Fragment] | null {
+      const activeInst = this.inst ?? inst
       let acc = headerH
       let k = 0
       for (let i = 0; i < bodySec.rowHeights.length; i++) {
@@ -454,13 +463,14 @@ function makeTableFragment(
       const headBody = bodySec.sliceRows(0, k)
       const tailBody = bodySec.sliceRows(k, bodySec.rowHeights.length)
 
-      const headFrag = makeTableFragment(headerSec, headBody, null, repeatHeader, path)
+      const headFrag = makeTableFragment(headerSec, headBody, null, repeatHeader, path, activeInst)
       const tailFrag = makeTableFragment(
         repeatHeader ? headerSec : null,
         tailBody,
         footerSec,
         repeatHeader,
         path,
+        activeInst,
       )
       return [headFrag, tailFrag]
     },
@@ -552,7 +562,7 @@ export async function layoutTable(
     }
   }
 
-  return makeTableFragment(headerSec, bodySec, footerSec, t.repeatHeader ?? false, path)
+  return makeTableFragment(headerSec, bodySec, footerSec, t.repeatHeader ?? false, path, t.$inst)
 }
 
 registerBlockHandler('table', layoutTable)

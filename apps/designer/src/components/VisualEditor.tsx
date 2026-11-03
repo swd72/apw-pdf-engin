@@ -202,7 +202,11 @@ export function VisualEditor({
           />
         )}
         {leftTab === 'data' && (
-          <DataView data={state.data} onChange={state.setData} />
+          <DataView
+            data={state.data}
+            doc={state.doc}
+            onChange={state.setData}
+          />
         )}
         {leftTab === 'templates' && (
           <TemplatesView

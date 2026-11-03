@@ -84,6 +84,16 @@ PDF output bytes (boxes are metadata), the saved template format, JSON mode, pan
 7. Existing tests stay green; new tests cover boxes (top-level, split across pages, `each` source paths, columns, table cells), `parseSourcePath`, overlay hit-testing and selection, toolbar actions, inline edit commit/cancel, presets validity, history merge and limits, guides persistence.
 8. Browser check at 1440px and 1024px: boxes line up with the rendered text at 50%, 100% and 150% zoom.
 
+## Addendum: editing text that comes from data (loop paragraphs)
+
+User feedback: double-clicking a body paragraph of `memo` showed only `{{p}}`, and the user could not tell where the text came from. They tried to add a root data field `p`, which has no effect because `p` is the loop variable of `each of: "body"`.
+
+- **Engine:** each `BlockBox` gains optional `inst?: number[]`, the loop indices of the instance that produced it (outermost first), e.g. `[1]` for the second item of `body`. Fragment boxes get it from the block's bind instance, glyph boxes from the existing `#n` suffix. Boxes outside loops have no `inst`.
+- **Designer:** `dataSourceOf(doc, blockPath, inst)` walks the enclosing `each` blocks of the selected block. When the text is exactly `{{<as>}}` or `{{<as>.<field path>}}` (no filters), and every enclosing `of` is a plain data path (a root key path, or a path that starts with an outer loop's `as`), it returns the concrete data path, e.g. `['body', 1]` or `['items', 0, 'name']`.
+- **Inline editor on a loop instance:** a small header above the textarea reads `ข้อความจากข้อมูล body[1]`. By default the textarea holds the **data value** and commits through `setData` (one undo step). A toggle `แก้แม่แบบ` switches to the template text (`{{p}}`), which changes every instance. When no data path can be resolved (filters, mixed text), the header reads `ซ้ำตาม body · รายการที่ 2` and the editor edits the template, as it does today.
+- **Hover badge** for a block inside a loop reads `ข้อความ · ซ้ำตาม body` so the user can see it repeats.
+- **Data tab:** a root key that has the same name as a loop variable in the document gets a warning chip `ชื่อซ้ำกับตัวแปรวนซ้ำ — ไม่มีผลในลูป`.
+
 ## Non-goals
 
 Dragging blocks on the paper to reposition them (the document is flow layout), resizing boxes by handles, per-character rich-text editing, multi-select, dark theme.

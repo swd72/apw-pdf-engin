@@ -12,6 +12,16 @@ export function blockKeyOf(sourcePath: string): string | null {
   return m ? m[0] : null
 }
 
+export function parseInst(inst: string | undefined): number[] | undefined {
+  if (!inst) return undefined
+  const m = INST_SUFFIX_RE.exec(inst)
+  if (!m) return undefined
+  return m[0]
+    .slice(1)
+    .split('#')
+    .map((s) => Number(s))
+}
+
 export function glyphBoxes(items: LayoutItem[]): BlockBox[] {
   const out: BlockBox[] = []
   const open = new Map<string, BlockBox>()
@@ -44,7 +54,9 @@ export function glyphBoxes(items: LayoutItem[]): BlockBox[] {
       existing.w = right - left
       existing.h = bottom - top
     } else {
-      const box: BlockBox = { path: key, x, y, w, h }
+      const inst = instMatch ? parseInst(instMatch[0]) : undefined
+      const box: BlockBox =
+        inst !== undefined ? { path: key, x, y, w, h, inst } : { path: key, x, y, w, h }
       out.push(box)
       open.set(openKey, box)
     }

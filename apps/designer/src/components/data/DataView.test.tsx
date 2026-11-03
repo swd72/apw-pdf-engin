@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, fireEvent, cleanup } from '@testing-library/react'
+import type { DocumentDef } from '@apw-pdf/core'
 import { DataView } from './DataView.js'
 
 afterEach(() => {
@@ -105,5 +106,52 @@ describe('DataView', () => {
 
     fireEvent.click(toggleBtn)
     expect(queryByDisplayValue('Somchai')).not.toBeNull()
+  })
+
+  it('DataView shows warning chip for root key matching each.as or table rows.as', () => {
+    const onChange = vi.fn()
+    const doc: DocumentDef = {
+      version: 1,
+      page: {
+        size: 'A4',
+        margin: { top: '2cm', bottom: '2cm', left: '3cm', right: '2cm' },
+      },
+      font: { family: 'Sarabun', size: '16pt' },
+      blocks: [
+        {
+          type: 'each',
+          of: 'body',
+          as: 'p',
+          blocks: [{ type: 'paragraph', text: '{{p}}' }],
+        },
+        {
+          type: 'table',
+          columns: [{ width: '*' }],
+          rows: {
+            each: 'items',
+            as: 'item',
+            cells: [{ text: '{{item.name}}' }],
+          },
+        },
+      ],
+    }
+    const data = {
+      p: 'ไม่มีผล',
+      item: 'ซ้ำกับตาราง',
+      subject: 'เรื่องปกติ',
+    }
+
+    const { getAllByText } = render(
+      <DataView data={data} doc={doc} onChange={onChange} />,
+    )
+
+    const chips = getAllByText('ชื่อซ้ำกับตัวแปรวนซ้ำ')
+    expect(chips.length).toBe(2)
+    expect(chips[0]!.getAttribute('title')).toBe(
+      'ไม่มีผลในลูป — ข้อความในลูปมาจากรายการของ body',
+    )
+    expect(chips[1]!.getAttribute('title')).toBe(
+      'ไม่มีผลในลูป — ข้อความในลูปมาจากรายการของ items',
+    )
   })
 })

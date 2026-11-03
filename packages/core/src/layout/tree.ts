@@ -60,6 +60,7 @@ export interface Rect {
 
 export interface BlockBox extends Rect {
   path: string
+  inst?: number[]
 }
 
 export interface PageInfo {
