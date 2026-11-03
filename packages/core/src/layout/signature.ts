@@ -19,6 +19,7 @@ export async function layoutSignature(
   const x = typeof xOrPath === 'number' ? xOrPath : ctx.box.contentLeft
   const width = typeof widthArg === 'number' ? widthArg : ctx.box.contentWidth
   const path = typeof xOrPath === 'string' ? xOrPath : (pathArg ?? 'blocks[0]')
+  const itemSourcePath = s.$inst ? `${path}${s.$inst}` : path
 
   const family = ctx.doc.font.family
   const size = toPt(ctx.doc.font.size)
@@ -137,7 +138,7 @@ export async function layoutSignature(
             })),
             text: s.prefix,
             clusters: prefixShaped.glyphs.map((g) => g.cluster),
-            sourcePath: path,
+            sourcePath: itemSourcePath,
           })
           if (!hasImage && sigLineW > 0) {
             out.push({
@@ -183,7 +184,7 @@ export async function layoutSignature(
         })),
         text: nameText,
         clusters: nameShaped.glyphs.map((g) => g.cluster),
-        sourcePath: path,
+        sourcePath: itemSourcePath,
       })
       currY += singleH
 
@@ -205,7 +206,7 @@ export async function layoutSignature(
           })),
           text: pos.text,
           clusters: pos.shaped.glyphs.map((g) => g.cluster),
-          sourcePath: path,
+          sourcePath: itemSourcePath,
         })
         currY += singleH
       }

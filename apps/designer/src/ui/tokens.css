@@ -1,0 +1,60 @@
+:root {
+  /* Core palette: calm neutral greys + one accent colour */
+  --c-accent: #2563eb;
+  --c-accent-hover: #1d4ed8;
+  --c-accent-subtle: #eff6ff;
+  --c-accent-border: #93c5fd;
+
+  --c-bg: #f8fafc;
+  --c-surface: #ffffff;
+  --c-surface-subtle: #f1f5f9;
+  --c-surface-hover: #f1f5f9;
+  --c-preview-canvas: #525659;
+
+  --c-border: #e2e8f0;
+  --c-border-strong: #cbd5e1;
+
+  --c-text: #0f172a;
+  --c-muted: #64748b;
+  --c-on-accent: #ffffff;
+
+  --c-danger: #dc2626;
+  --c-danger-bg: #fef2f2;
+  --c-danger-border: #fecaca;
+
+  --c-warn: #b45309;
+  --c-warn-bg: #fffbeb;
+  --c-warn-border: #fde68a;
+
+  --c-success: #15803d;
+  --c-success-bg: #f0fdf4;
+  --c-success-border: #bbf7d0;
+
+  /* 4/8px spacing scale */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
+
+  /* Typography */
+  --font: 'Sarabun', 'Noto Sans Thai', system-ui, 'Segoe UI', Tahoma, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs: 14px;
+  --fs-lg: 16px;
+
+  /* Focus & elevation */
+  --focus: 0 0 0 2px rgba(37, 99, 235, 0.28);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 10px 25px rgba(15, 23, 42, 0.14);
+}

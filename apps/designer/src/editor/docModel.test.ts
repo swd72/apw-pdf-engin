@@ -7,6 +7,7 @@ import {
   insertBlock,
   removeBlock,
   moveBlock,
+  moveBlockTo,
   moveInto,
   moveOut,
   duplicateBlock,
@@ -184,5 +185,88 @@ describe('docModel', () => {
     expect(() => moveInto(doc, ['blocks', 1], ['blocks', 0, 'columns', 0, 'blocks'])).not.toThrow()
     expect(() => moveOut(doc, ['blocks', 0, 'columns', 0, 'blocks', 0])).not.toThrow()
     expect(() => duplicateBlock(doc, ['blocks', 0])).not.toThrow()
+  })
+
+  it('moveBlockTo reorders within the root list', () => {
+    const p0: ParagraphBlock = { type: 'paragraph', text: '0' }
+    const p1: ParagraphBlock = { type: 'paragraph', text: '1' }
+    const p2: ParagraphBlock = { type: 'paragraph', text: '2' }
+    const doc = createBaseDoc([p0, p1, p2])
+
+    const next = moveBlockTo(doc, ['blocks', 2], ['blocks'], 0)
+    expect(next.blocks.map((b) => (b as ParagraphBlock).text)).toEqual(['2', '0', '1'])
+  })
+
+  it('moveBlockTo moves into columns[0].blocks', () => {
+    const p0: ParagraphBlock = { type: 'paragraph', text: 'standalone' }
+    const colBlock: ColumnsBlock = {
+      type: 'columns',
+      columns: [{ width: '*', blocks: [] }],
+    }
+    const doc = createBaseDoc([colBlock, p0])
+
+    const next = moveBlockTo(doc, ['blocks', 1], ['blocks', 0, 'columns', 0, 'blocks'], 0)
+    expect(next.blocks).toHaveLength(1)
+    const updatedCol = next.blocks[0] as ColumnsBlock
+    expect(updatedCol.columns[0]?.blocks).toEqual([p0])
+  })
+
+  it('moveBlockTo moves out of a container to root', () => {
+    const child: ParagraphBlock = { type: 'paragraph', text: 'nested' }
+    const colBlock: ColumnsBlock = {
+      type: 'columns',
+      columns: [{ width: '*', blocks: [child] }],
+    }
+    const doc = createBaseDoc([colBlock])
+
+    const next = moveBlockTo(doc, ['blocks', 0, 'columns', 0, 'blocks', 0], ['blocks'], 1)
+    expect(next.blocks).toHaveLength(2)
+    expect((next.blocks[0] as ColumnsBlock).columns[0]?.blocks).toHaveLength(0)
+    expect(next.blocks[1]).toEqual(child)
+  })
+
+  it('moveBlockTo adjusts the index when moving later in the same list', () => {
+    const p0: ParagraphBlock = { type: 'paragraph', text: '0' }
+    const p1: ParagraphBlock = { type: 'paragraph', text: '1' }
+    const p2: ParagraphBlock = { type: 'paragraph', text: '2' }
+    const doc = createBaseDoc([p0, p1, p2])
+
+    const next = moveBlockTo(doc, ['blocks', 0], ['blocks'], 2)
+    expect(next.blocks.map((b) => (b as ParagraphBlock).text)).toEqual(['1', '2', '0'])
+
+    const colBlock: ColumnsBlock = {
+      type: 'columns',
+      columns: [{ width: '*', blocks: [] }],
+    }
+    const docWithCol = createBaseDoc([p0, colBlock])
+    const movedIntoLaterSibling = moveBlockTo(
+      docWithCol,
+      ['blocks', 0],
+      ['blocks', 1, 'columns', 0, 'blocks'],
+      0,
+    )
+    expect(movedIntoLaterSibling.blocks).toHaveLength(1)
+    expect((movedIntoLaterSibling.blocks[0] as ColumnsBlock).columns[0]?.blocks).toEqual([p0])
+  })
+
+  it('moveBlockTo refuses its own descendant and returns the same doc', () => {
+    const colBlock: ColumnsBlock = {
+      type: 'columns',
+      columns: [{ width: '*', blocks: [] }],
+    }
+    const doc = createBaseDoc([colBlock])
+
+    const next = moveBlockTo(doc, ['blocks', 0], ['blocks', 0, 'columns', 0, 'blocks'], 0)
+    expect(next).toBe(doc)
+  })
+
+  it('moveBlockTo invalid path returns the same doc', () => {
+    const p0: ParagraphBlock = { type: 'paragraph', text: '0' }
+    const doc = createBaseDoc([p0])
+
+    expect(moveBlockTo(doc, ['blocks', 99], ['blocks'], 0)).toBe(doc)
+    expect(moveBlockTo(doc, ['blocks', 0], ['invalid'], 0)).toBe(doc)
+    expect(moveBlockTo(doc, ['blocks', 0], ['blocks'], 99)).toBe(doc)
+    expect(moveBlockTo(doc, ['blocks', 0], ['blocks'], -1)).toBe(doc)
   })
 })

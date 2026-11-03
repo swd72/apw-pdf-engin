@@ -271,7 +271,12 @@ async function layoutTableSection(
 
       for (let bIdx = 0; bIdx < cellBlocks.length; bIdx++) {
         const blk = cellBlocks[bIdx]!
-        const blkPath = cell.blocks !== undefined ? `${cellPath}.blocks[${bIdx}]` : cellPath
+        const blkPath =
+          blk.$src && !blk.$src.includes('.rows.cells[')
+            ? blk.$src
+            : cell.blocks !== undefined
+              ? `${cellPath}.blocks[${bIdx}]`
+              : cellPath
         const res = await layoutBlockToFragment(blk, ctx, innerX, innerW, blkPath)
         if (res.fragment) {
           const topOff = currOffset + (bIdx === 0 ? 0 : res.fragment.spaceBefore)

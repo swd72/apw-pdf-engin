@@ -1,12 +1,27 @@
 import React, { useEffect, useRef } from 'react'
+import type { PageInfo } from '@apw-pdf/core'
 import { usePdf } from './usePdf.js'
+
+const PAGE_WRAP_STYLE: React.CSSProperties = { position: 'relative' }
+const PAGE_OVERLAY_STYLE: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+}
 
 export interface PdfPreviewProps {
   doc: unknown
   data: unknown
   scale?: number
   className?: string
+  pageClassName?: string
   debounceMs?: number
+  onPageCountChange?: (pageCount: number) => void
+  renderOverlay?: (
+    pageIndex: number,
+    scale: number,
+    page: PageInfo,
+  ) => React.ReactNode
+  onPagesChange?: (pages: PageInfo[]) => void
 }
 
 export function PdfPreview({
@@ -14,17 +29,49 @@ export function PdfPreview({
   data,
   scale = 1,
   className,
+  pageClassName,
   debounceMs,
+  onPageCountChange,
+  renderOverlay,
+  onPagesChange,
 }: PdfPreviewProps) {
-  const { bytes, pageCount, status, error } = usePdf(doc, data, { debounceMs })
+  const wantBoxes = Boolean(renderOverlay || onPagesChange)
+  const { bytes, pageCount, pages, status, error } = usePdf(doc, data, {
+    debounceMs,
+    boxes: wantBoxes,
+  })
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([])
-  const activeRenderTaskRef = useRef<{ cancel: () => void; promise: Promise<unknown> } | null>(null)
-  const activeLoadingTaskRef = useRef<{ destroy: () => Promise<void> } | null>(null)
+  const activeRenderTaskRef = useRef<{
+    cancel: () => void
+    promise: Promise<unknown>
+  } | null>(null)
+  const activeLoadingTaskRef = useRef<{ destroy: () => Promise<void> } | null>(
+    null,
+  )
+  const onPageCountRef = useRef(onPageCountChange)
+  onPageCountRef.current = onPageCountChange
+  const onPagesRef = useRef(onPagesChange)
+  onPagesRef.current = onPagesChange
+
+  useEffect(() => {
+    if (status === 'ready' && typeof pageCount === 'number' && pageCount > 0) {
+      onPageCountRef.current?.(pageCount)
+    }
+  }, [status, pageCount])
+
+  useEffect(() => {
+    if (pages) {
+      onPagesRef.current?.(pages)
+    }
+  }, [pages])
 
   useEffect(() => {
     if (status !== 'ready' || !bytes || !pageCount) return
     let cancelled = false
-    let currentRenderTask: { cancel: () => void; promise: Promise<unknown> } | null = null
+    let currentRenderTask: {
+      cancel: () => void
+      promise: Promise<unknown>
+    } | null = null
     let currentLoadingTask: { destroy: () => Promise<void> } | null = null
 
     void (async () => {
@@ -126,7 +173,7 @@ export function PdfPreview({
     }
   }, [bytes, pageCount, scale, status])
 
-  if (status === 'error' && error) {
+  if (status === 'error' && error && !bytes) {
     return (
       <div className={className} role="alert">
         {error.code}: {error.message}
@@ -140,14 +187,39 @@ export function PdfPreview({
     <div className={className}>
       {Array.from({ length: total }, (_, idx) => {
         const pageNum = idx + 1
+        if (!renderOverlay) {
+          return (
+            <canvas
+              key={pageNum}
+              className={pageClassName}
+              aria-label={`หน้า ${pageNum} จาก ${total}`}
+              ref={(el) => {
+                canvasRefs.current[idx] = el
+              }}
+            />
+          )
+        }
+        const pageInfo = pages?.[idx]
         return (
-          <canvas
+          <div
             key={pageNum}
-            aria-label={`หน้า ${pageNum} จาก ${total}`}
-            ref={(el) => {
-              canvasRefs.current[idx] = el
-            }}
-          />
+            className="apw-pdf-page"
+            data-page-index={idx}
+            style={PAGE_WRAP_STYLE}
+          >
+            <canvas
+              className={pageClassName}
+              aria-label={`หน้า ${pageNum} จาก ${total}`}
+              ref={(el) => {
+                canvasRefs.current[idx] = el
+              }}
+            />
+            {pageInfo && (
+              <div className="apw-pdf-page__overlay" style={PAGE_OVERLAY_STYLE}>
+                {renderOverlay(idx, scale, pageInfo)}
+              </div>
+            )}
+          </div>
         )
       })}
     </div>

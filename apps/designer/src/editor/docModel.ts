@@ -190,7 +190,7 @@ export function canMoveInto(
   return true
 }
 
-function adjustPathAfterRemoval(removedPath: BlockPath, targetPath: BlockPath): BlockPath {
+export function adjustPathAfterRemoval(removedPath: BlockPath, targetPath: BlockPath): BlockPath {
   const parentList = removedPath.slice(0, -1)
   const removedIdx = removedPath[removedPath.length - 1] as number
   if (targetPath.length <= parentList.length) return targetPath
@@ -204,6 +204,27 @@ function adjustPathAfterRemoval(removedPath: BlockPath, targetPath: BlockPath): 
     return adjusted
   }
   return targetPath
+}
+
+export function moveBlockTo(
+  doc: DocumentDef,
+  from: BlockPath,
+  toListPath: BlockPath,
+  index: number,
+): DocumentDef {
+  if (!canMoveInto(doc, from, toListPath)) return doc
+  const block = getBlock(doc, from)
+  if (!block) return doc
+
+  const adjustedTarget = adjustPathAfterRemoval(from, toListPath)
+  const docWithoutBlock = removeBlock(doc, from)
+  if (docWithoutBlock === doc) return doc
+
+  const targetList = getIn(docWithoutBlock, adjustedTarget)
+  if (!Array.isArray(targetList)) return doc
+  if (typeof index !== 'number' || index < 0 || index > targetList.length) return doc
+
+  return insertBlock(docWithoutBlock, adjustedTarget, index, block)
 }
 
 export function moveInto(

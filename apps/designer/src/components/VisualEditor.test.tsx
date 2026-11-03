@@ -1,13 +1,21 @@
 import React from 'react'
-import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, fireEvent, cleanup } from '@testing-library/react'
-import type { DocumentDef } from '@apw-pdf/core'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import type { Block, DocumentDef } from '@apw-pdf/core'
 import { memo } from '@apw-pdf/templates'
 import { VisualEditor } from './VisualEditor.js'
 
-afterEach(() => {
-  cleanup()
-})
+function createDoc(blocks: Block[] = []): DocumentDef {
+  return {
+    version: 1,
+    page: {
+      size: 'A4',
+      margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
+    },
+    font: { family: 'Sarabun', size: '16pt' },
+    blocks,
+  }
+}
 
 function countAllBlocks(blocks: any[]): number {
   let count = 0
@@ -46,7 +54,11 @@ function countAllBlocks(blocks: any[]): number {
             }
           }
         }
-      } else if (block.rows && typeof block.rows === 'object' && Array.isArray(block.rows.cells)) {
+      } else if (
+        block.rows &&
+        typeof block.rows === 'object' &&
+        Array.isArray(block.rows.cells)
+      ) {
         for (const cell of block.rows.cells) {
           if (cell && Array.isArray(cell.blocks)) {
             count += countAllBlocks(cell.blocks)
@@ -58,7 +70,53 @@ function countAllBlocks(blocks: any[]): number {
   return count
 }
 
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  )
+})
+
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
+
 describe('VisualEditor', () => {
+  it('VisualEditor selecting an outline row shows its properties', () => {
+    const sampleDoc = createDoc([{ type: 'paragraph', text: 'สวัสดี {{name}}' }])
+    render(
+      <VisualEditor
+        doc={sampleDoc}
+        data={{ name: 'โลก' }}
+        onChange={() => {}}
+        centre={<div>stage</div>}
+      />,
+    )
+    fireEvent.click(screen.getByRole('treeitem'))
+    expect(screen.getByDisplayValue('สวัสดี {{name}}')).not.toBeNull()
+  })
+
+  it('VisualEditor adding a block from the plus menu appends it and selects it', () => {
+    const onDocChange = vi.fn()
+    render(
+      <VisualEditor
+        doc={createDoc([])}
+        data={{}}
+        onDocChange={onDocChange}
+        centre={<div>stage</div>}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '+ เพิ่ม' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'ข้อความ' }))
+    expect(onDocChange).toHaveBeenCalledTimes(1)
+    expect(screen.getByLabelText('Paragraph text')).not.toBeNull()
+  })
+
   it('VisualEditor renders tree, data panel and inspector, and adding a block calls onChange with the new doc', () => {
     const doc: DocumentDef = JSON.parse(JSON.stringify(memo.document))
     const initialRootCount = doc.blocks.length
@@ -67,67 +125,35 @@ describe('VisualEditor', () => {
     const onChange = vi.fn()
 
     const { getByRole, getByText, getByDisplayValue } = render(
-      <VisualEditor doc={doc} data={data} onChange={onChange} />,
+      <VisualEditor
+        doc={doc}
+        data={data}
+        onChange={onChange}
+        centre={<div>stage</div>}
+      />,
     )
 
-    // 1. Renders BlockTree with existing blocks (including nested ones)
+    // 1. Renders OutlineTree with existing blocks (including nested ones)
     const tree = getByRole('tree')
     expect(tree).not.toBeNull()
     const treeitems = document.querySelectorAll('[role="treeitem"]')
     expect(treeitems.length).toBe(initialTotalBlocks)
 
-    // 2. Renders DataPanel with key input
-    expect(getByText('Data Panel')).not.toBeNull()
+    // 2. Unselected state shows DocumentSettings in right panel
+    expect(getByText('ตั้งค่าเอกสาร')).not.toBeNull()
+
+    // 3. Switch to Data tab and verify key input
+    fireEvent.click(getByRole('tab', { name: 'ข้อมูล' }))
     expect(getByDisplayValue('title')).not.toBeNull()
 
-    // 3. Renders Inspector (unselected state shows hint)
-    expect(
-      getByText('Select a block in the tree to inspect its properties.'),
-    ).not.toBeNull()
-
-    // 4. Adding a block calls onChange with the new doc
-    const addButtons = document.querySelectorAll('button[aria-label="Add block"]')
-    expect(addButtons.length).toBeGreaterThan(0)
-    const rootAddButton = addButtons[addButtons.length - 1]!
-    fireEvent.click(rootAddButton)
-
-    // Find and click 'Paragraph' in the opened add-block menu
-    const addParagraphOption = getByText('Paragraph')
-    fireEvent.click(addParagraphOption)
+    // 4. Switch back to Outline tab and add a block
+    fireEvent.click(getByRole('tab', { name: 'โครงสร้าง' }))
+    fireEvent.click(getByRole('button', { name: '+ เพิ่ม' }))
+    fireEvent.click(getByRole('menuitem', { name: 'ข้อความ' }))
 
     expect(onChange).toHaveBeenCalledTimes(1)
     const nextPayload = onChange.mock.calls[0]![0]
     expect(nextPayload.doc.blocks.length).toBe(initialRootCount + 1)
     expect(nextPayload.data).toEqual(data)
-  })
-
-  it('renders inspector form when a block is selected in the tree', () => {
-    const doc: DocumentDef = JSON.parse(JSON.stringify(memo.document))
-    const data = {}
-    const onChange = vi.fn()
-
-    const { getAllByRole, getByText, queryByText } = render(
-      <VisualEditor doc={doc} data={data} onChange={onChange} />,
-    )
-
-    // Initially unselected hint is visible
-    expect(
-      getByText(/Select a block in the tree/i),
-    ).not.toBeNull()
-
-    const treeitems = getAllByRole('treeitem')
-    expect(treeitems.length).toBeGreaterThan(0)
-
-    // Click the inner label element of the first tree item to trigger selection
-    const itemLabel = treeitems[0]!.querySelector('span') ?? treeitems[0]!
-    fireEvent.click(itemLabel)
-
-    // The unselected hint should no longer be visible
-    expect(
-      queryByText(/Select a block in the tree/i),
-    ).toBeNull()
-
-    // The inspector header for the selected block is now rendered
-    expect(getByText(/Inspector:/i)).not.toBeNull()
   })
 })

@@ -5,6 +5,8 @@ import {
   insertBlock,
   removeBlock,
   moveBlock,
+  moveBlockTo as moveBlockToDoc,
+  adjustPathAfterRemoval,
   canMoveInto,
   moveInto,
   moveOut,
@@ -13,6 +15,8 @@ import {
 } from './docModel.js'
 import { BLOCK_TYPES } from './blockCatalog.js'
 import { unresolved, type Binding } from './bindings.js'
+import { createHistory } from './history.js'
+import { mergeSampleData } from './presets.js'
 
 export interface EditorState {
   doc: DocumentDef
@@ -20,14 +24,25 @@ export interface EditorState {
   selectedPath: BlockPath | null
   select(path: BlockPath | null): void
   addBlock(listPath: BlockPath, index: number, type: Block['type']): void
+  insertBlocks(
+    listPath: BlockPath,
+    index: number,
+    blocks: Block[],
+    sampleData?: Record<string, unknown>,
+  ): void
   removeSelected(): void
   moveSelected(delta: -1 | 1): void
   moveSelectedInto(targetListPath: BlockPath): void
   moveSelectedOut(): void
+  moveBlockTo(from: BlockPath, toListPath: BlockPath, index: number): void
   duplicateSelected(): void
   updateBlock(path: BlockPath, patch: Record<string, unknown>): void
   replaceBlock(path: BlockPath, block: Block): void
   setData(next: unknown): void
+  undo(): void
+  redo(): void
+  canUndo: boolean
+  canRedo: boolean
   warnings: Binding[]
 }
 
@@ -65,24 +80,101 @@ function getIn(obj: unknown, path: BlockPath): unknown {
   return curr
 }
 
+function usesGarudaAsset(blocks: Block[]): boolean {
+  for (const b of blocks) {
+    if (b.type === 'image' && b.src === 'asset:garuda') return true
+    if (b.type === 'columns' && Array.isArray(b.columns)) {
+      for (const col of b.columns) {
+        if (Array.isArray(col.blocks) && usesGarudaAsset(col.blocks)) return true
+      }
+    }
+    if (
+      b.type === 'each' &&
+      Array.isArray(b.blocks) &&
+      usesGarudaAsset(b.blocks)
+    ) {
+      return true
+    }
+    if (b.type === 'if') {
+      if (Array.isArray(b.then) && usesGarudaAsset(b.then)) return true
+      if (Array.isArray(b.else) && usesGarudaAsset(b.else)) return true
+    }
+  }
+  return false
+}
+
 export function useEditorState(
   initial: { doc: DocumentDef; data: unknown },
   onChange: (next: { doc: DocumentDef; data: unknown }) => void,
 ): EditorState {
   const [doc, setDoc] = useState<DocumentDef>(initial.doc)
   const [data, setDataState] = useState<unknown>(initial.data)
-  const [selectedPath, setSelectedPath] = useState<BlockPath | null>(null)
+  const [selectedPath, setSelectedPathState] = useState<BlockPath | null>(null)
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
+
+  const docRef = useRef<DocumentDef>(initial.doc)
+  const dataRef = useRef<unknown>(initial.data)
+  const selectedPathRef = useRef<BlockPath | null>(null)
+  const historyRef = useRef(createHistory())
+
+  const setSelectedPath = useCallback((next: BlockPath | null) => {
+    selectedPathRef.current = next
+    setSelectedPathState(next)
+  }, [])
+
+  const syncHistoryFlags = useCallback(() => {
+    const nextUndo = historyRef.current.canUndo()
+    const nextRedo = historyRef.current.canRedo()
+    setCanUndo((prev) => (prev === nextUndo ? prev : nextUndo))
+    setCanRedo((prev) => (prev === nextRedo ? prev : nextRedo))
+  }, [])
+
+  const commit = useCallback(
+    (nextDoc: DocumentDef, nextData: unknown, mergeKey?: string) => {
+      const prevDoc = docRef.current
+      const prevData = dataRef.current
+      if (nextDoc === prevDoc && nextData === prevData) return
+      historyRef.current.push({ doc: prevDoc, data: prevData }, mergeKey)
+      docRef.current = nextDoc
+      dataRef.current = nextData
+      setDoc(nextDoc)
+      setDataState(nextData)
+      syncHistoryFlags()
+      onChange({ doc: nextDoc, data: nextData })
+    },
+    [onChange, syncHistoryFlags],
+  )
 
   const initialRef = useRef(initial)
   useEffect(() => {
-    if (initial.doc !== initialRef.current.doc && initial.doc !== doc) {
+    let resynced = false
+    if (
+      initial.doc !== initialRef.current.doc &&
+      initial.doc !== docRef.current
+    ) {
+      docRef.current = initial.doc
       setDoc(initial.doc)
+      resynced = true
     }
-    if (initial.data !== initialRef.current.data && initial.data !== data) {
+    if (
+      initial.data !== initialRef.current.data &&
+      initial.data !== dataRef.current
+    ) {
+      dataRef.current = initial.data
       setDataState(initial.data)
+      resynced = true
+    }
+    if (resynced) {
+      historyRef.current.reset()
+      syncHistoryFlags()
+      const activePath = selectedPathRef.current
+      if (activePath && !getBlock(docRef.current, activePath)) {
+        setSelectedPath(null)
+      }
     }
     initialRef.current = initial
-  }, [initial.doc, initial.data, doc, data])
+  }, [initial.doc, initial.data, setSelectedPath, syncHistoryFlags])
 
   const warnings = useMemo(() => unresolved(doc, data), [doc, data])
 
@@ -92,14 +184,14 @@ export function useEditorState(
         setSelectedPath(null)
         return
       }
-      const block = getBlock(doc, path)
+      const block = getBlock(docRef.current, path)
       if (block) {
         setSelectedPath(path)
       } else {
         setSelectedPath(null)
       }
     },
-    [doc],
+    [setSelectedPath],
   )
 
   const addBlock = useCallback(
@@ -109,34 +201,67 @@ export function useEditorState(
         ? descriptor.create()
         : ({ type, text: '' } as unknown as Block)
 
-      const nextDoc = insertBlock(doc, listPath, index, block)
-      if (nextDoc !== doc) {
-        setDoc(nextDoc)
+      const currentDoc = docRef.current
+      const nextDoc = insertBlock(currentDoc, listPath, index, block)
+      if (nextDoc !== currentDoc) {
         const newPath: BlockPath = [...listPath, index]
         setSelectedPath(newPath)
-        onChange({ doc: nextDoc, data })
+        commit(nextDoc, dataRef.current)
       }
     },
-    [doc, data, onChange],
+    [commit, setSelectedPath],
+  )
+
+  const insertBlocks = useCallback(
+    (
+      listPath: BlockPath,
+      index: number,
+      blocks: Block[],
+      sampleData?: Record<string, unknown>,
+    ) => {
+      if (!Array.isArray(blocks) || blocks.length === 0) return
+      const currentDoc = docRef.current
+      let nextDoc = currentDoc
+      for (let i = 0; i < blocks.length; i++) {
+        nextDoc = insertBlock(nextDoc, listPath, index + i, blocks[i]!)
+      }
+      if (nextDoc === currentDoc) return
+
+      if (usesGarudaAsset(blocks) && !nextDoc.assets?.garuda) {
+        nextDoc = {
+          ...nextDoc,
+          assets: { ...nextDoc.assets, garuda: 'asset:garuda' },
+        }
+      }
+
+      const currentData = dataRef.current
+      const nextData = sampleData
+        ? mergeSampleData(currentData, sampleData)
+        : currentData
+
+      setSelectedPath([...listPath, index])
+      commit(nextDoc, nextData)
+    },
+    [commit, setSelectedPath],
   )
 
   const removeSelected = useCallback(() => {
-    if (!selectedPath || selectedPath.length === 0) return
-    const parentListPath = selectedPath.slice(0, -1)
-    const index = selectedPath[selectedPath.length - 1]
+    const activePath = selectedPathRef.current ?? selectedPath
+    if (!activePath || activePath.length === 0) return
+    const parentListPath = activePath.slice(0, -1)
+    const index = activePath[activePath.length - 1]
     if (typeof index !== 'number') return
 
-    const nextDoc = removeBlock(doc, selectedPath)
-    if (nextDoc !== doc) {
-      setDoc(nextDoc)
-
+    const currentDoc = docRef.current
+    const nextDoc = removeBlock(currentDoc, activePath)
+    if (nextDoc !== currentDoc) {
       if (index > 0) {
         setSelectedPath([...parentListPath, index - 1])
       } else {
         let parentBlockPath: BlockPath | null = null
-        for (let k = selectedPath.length - 1; k >= 1; k--) {
-          const sub = selectedPath.slice(0, k)
-          if (getBlock(doc, sub)) {
+        for (let k = activePath.length - 1; k >= 1; k--) {
+          const sub = activePath.slice(0, k)
+          if (getBlock(currentDoc, sub)) {
             parentBlockPath = sub
             break
           }
@@ -144,106 +269,162 @@ export function useEditorState(
         setSelectedPath(parentBlockPath)
       }
 
-      onChange({ doc: nextDoc, data })
+      commit(nextDoc, dataRef.current)
     }
-  }, [doc, data, selectedPath, onChange])
+  }, [selectedPath, setSelectedPath, commit])
 
   const moveSelected = useCallback(
     (delta: -1 | 1) => {
-      if (!selectedPath || selectedPath.length === 0) return
-      const parentListPath = selectedPath.slice(0, -1)
-      const index = selectedPath[selectedPath.length - 1]
+      const activePath = selectedPathRef.current ?? selectedPath
+      if (!activePath || activePath.length === 0) return
+      const parentListPath = activePath.slice(0, -1)
+      const index = activePath[activePath.length - 1]
       if (typeof index !== 'number') return
 
-      const nextDoc = moveBlock(doc, selectedPath, delta)
-      if (nextDoc !== doc) {
-        setDoc(nextDoc)
+      const currentDoc = docRef.current
+      const nextDoc = moveBlock(currentDoc, activePath, delta)
+      if (nextDoc !== currentDoc) {
         setSelectedPath([...parentListPath, index + delta])
-        onChange({ doc: nextDoc, data })
+        commit(nextDoc, dataRef.current)
       }
     },
-    [doc, data, selectedPath, onChange],
+    [selectedPath, setSelectedPath, commit],
   )
 
   const moveSelectedInto = useCallback(
     (targetListPath: BlockPath) => {
-      if (!selectedPath || !canMoveInto(doc, selectedPath, targetListPath)) return
-      const nextDoc = moveInto(doc, selectedPath, targetListPath)
-      if (nextDoc !== doc) {
-        setDoc(nextDoc)
+      const activePath = selectedPathRef.current ?? selectedPath
+      const currentDoc = docRef.current
+      if (!activePath || !canMoveInto(currentDoc, activePath, targetListPath)) {
+        return
+      }
+      const nextDoc = moveInto(currentDoc, activePath, targetListPath)
+      if (nextDoc !== currentDoc) {
         const targetList = getIn(nextDoc, targetListPath) as Block[]
         const newIdx = Array.isArray(targetList) ? targetList.length - 1 : 0
         setSelectedPath([...targetListPath, newIdx])
-        onChange({ doc: nextDoc, data })
+        commit(nextDoc, dataRef.current)
       }
     },
-    [doc, data, selectedPath, onChange],
+    [selectedPath, setSelectedPath, commit],
   )
 
   const moveSelectedOut = useCallback(() => {
-    if (!selectedPath || selectedPath.length === 0) return
-    const nextDoc = moveOut(doc, selectedPath)
-    if (nextDoc !== doc) {
-      setDoc(nextDoc)
+    const activePath = selectedPathRef.current ?? selectedPath
+    if (!activePath || activePath.length === 0) return
+    const currentDoc = docRef.current
+    const nextDoc = moveOut(currentDoc, activePath)
+    if (nextDoc !== currentDoc) {
       let parentBlockPath: BlockPath | null = null
-      for (let k = selectedPath.length - 1; k >= 1; k--) {
-        const sub = selectedPath.slice(0, k)
-        if (getBlock(doc, sub)) {
+      for (let k = activePath.length - 1; k >= 1; k--) {
+        const sub = activePath.slice(0, k)
+        if (getBlock(currentDoc, sub)) {
           parentBlockPath = sub
           break
         }
       }
       if (parentBlockPath) {
         const parentListPath = parentBlockPath.slice(0, -1)
-        const parentIndex = parentBlockPath[parentBlockPath.length - 1] as number
+        const parentIndex = parentBlockPath[
+          parentBlockPath.length - 1
+        ] as number
         setSelectedPath([...parentListPath, parentIndex + 1])
       }
-      onChange({ doc: nextDoc, data })
+      commit(nextDoc, dataRef.current)
     }
-  }, [doc, data, selectedPath, onChange])
+  }, [selectedPath, setSelectedPath, commit])
+
+  const moveBlockTo = useCallback(
+    (from: BlockPath, toListPath: BlockPath, index: number) => {
+      const currentDoc = docRef.current
+      const nextDoc = moveBlockToDoc(currentDoc, from, toListPath, index)
+      if (nextDoc !== currentDoc) {
+        const adjustedTarget = adjustPathAfterRemoval(from, toListPath)
+        setSelectedPath([...adjustedTarget, index])
+        commit(nextDoc, dataRef.current)
+      }
+    },
+    [setSelectedPath, commit],
+  )
 
   const duplicateSelected = useCallback(() => {
-    if (!selectedPath || selectedPath.length === 0) return
-    const parentListPath = selectedPath.slice(0, -1)
-    const index = selectedPath[selectedPath.length - 1]
+    const activePath = selectedPathRef.current ?? selectedPath
+    if (!activePath || activePath.length === 0) return
+    const parentListPath = activePath.slice(0, -1)
+    const index = activePath[activePath.length - 1]
     if (typeof index !== 'number') return
 
-    const nextDoc = duplicateBlock(doc, selectedPath)
-    if (nextDoc !== doc) {
-      setDoc(nextDoc)
+    const currentDoc = docRef.current
+    const nextDoc = duplicateBlock(currentDoc, activePath)
+    if (nextDoc !== currentDoc) {
       setSelectedPath([...parentListPath, index + 1])
-      onChange({ doc: nextDoc, data })
+      commit(nextDoc, dataRef.current)
     }
-  }, [doc, data, selectedPath, onChange])
+  }, [selectedPath, setSelectedPath, commit])
 
   const replaceBlock = useCallback(
     (path: BlockPath, block: Block) => {
-      const nextDoc = updateIn(doc, path, () => block) as DocumentDef
-      if (nextDoc !== doc) {
-        setDoc(nextDoc)
-        onChange({ doc: nextDoc, data })
+      const currentDoc = docRef.current
+      const nextDoc = updateIn(currentDoc, path, () => block) as DocumentDef
+      if (nextDoc !== currentDoc) {
+        commit(nextDoc, dataRef.current, `block:${path.join('.')}`)
       }
     },
-    [doc, data, onChange],
+    [commit],
   )
 
   const updateBlock = useCallback(
     (path: BlockPath, patch: Record<string, unknown>) => {
-      const current = getBlock(doc, path)
+      const current = getBlock(docRef.current, path)
       if (!current) return
       const nextBlock = { ...current, ...patch } as Block
       replaceBlock(path, nextBlock)
     },
-    [doc, replaceBlock],
+    [replaceBlock],
   )
 
   const setData = useCallback(
     (next: unknown) => {
-      setDataState(next)
-      onChange({ doc, data: next })
+      commit(docRef.current, next, 'data')
     },
-    [doc, onChange],
+    [commit],
   )
+
+  const undo = useCallback(() => {
+    const restored = historyRef.current.undo({
+      doc: docRef.current,
+      data: dataRef.current,
+    })
+    if (!restored) return
+    docRef.current = restored.doc
+    dataRef.current = restored.data
+    setDoc(restored.doc)
+    setDataState(restored.data)
+    const activePath = selectedPathRef.current
+    if (activePath && !getBlock(restored.doc, activePath)) {
+      setSelectedPath(null)
+    }
+    syncHistoryFlags()
+    onChange({ doc: restored.doc, data: restored.data })
+  }, [onChange, setSelectedPath, syncHistoryFlags])
+
+  const redo = useCallback(() => {
+    const restored = historyRef.current.redo({
+      doc: docRef.current,
+      data: dataRef.current,
+    })
+    if (!restored) return
+    docRef.current = restored.doc
+    dataRef.current = restored.data
+    setDoc(restored.doc)
+    setDataState(restored.data)
+    const activePath = selectedPathRef.current
+    if (activePath && !getBlock(restored.doc, activePath)) {
+      setSelectedPath(null)
+    }
+    syncHistoryFlags()
+    onChange({ doc: restored.doc, data: restored.data })
+  }, [onChange, setSelectedPath, syncHistoryFlags])
 
   return {
     doc,
@@ -251,14 +432,20 @@ export function useEditorState(
     selectedPath,
     select,
     addBlock,
+    insertBlocks,
     removeSelected,
     moveSelected,
     moveSelectedInto,
     moveSelectedOut,
+    moveBlockTo,
     duplicateSelected,
     updateBlock,
     replaceBlock,
     setData,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
     warnings,
   }
 }

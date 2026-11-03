@@ -33,30 +33,37 @@ export type ResolvedInline =
   | { pageNumber: true }
   | { pageCount: true }
 
-export interface ResolvedParagraph extends Omit<ParagraphBlock, 'runs'> {
+export interface ResolvedBlockMeta {
+  $src?: string
+  $inst?: string
+}
+
+export interface ResolvedParagraph extends Omit<ParagraphBlock, 'runs'>, ResolvedBlockMeta {
   runs?: ResolvedInline[]
 }
 
-export type ResolvedImage = ImageBlock
+export type ResolvedImage = ImageBlock & ResolvedBlockMeta
 
 export interface ResolvedCell extends Omit<Cell, 'blocks'> {
   blocks?: ResolvedBlock[]
 }
 
-export interface ResolvedTable extends Omit<TableBlock, 'header' | 'rows' | 'footer'> {
+export interface ResolvedTable
+  extends Omit<TableBlock, 'header' | 'rows' | 'footer'>,
+    ResolvedBlockMeta {
   header?: ResolvedCell[][]
   rows: ResolvedCell[][]
   footer?: ResolvedCell[][]
 }
 
-export interface ResolvedColumns {
+export interface ResolvedColumns extends ResolvedBlockMeta {
   type: 'columns'
   columns: { width: ColumnWidthSpec; align?: 'left' | 'right'; blocks: ResolvedBlock[] }[]
   gap?: Length
   keepTogether?: boolean
 }
 
-export type ResolvedSignature = SignatureBlock
+export type ResolvedSignature = SignatureBlock & ResolvedBlockMeta
 
 export type ResolvedBlock =
   | ResolvedParagraph
@@ -64,9 +71,9 @@ export type ResolvedBlock =
   | ResolvedTable
   | ResolvedColumns
   | ResolvedSignature
-  | SpacerBlock
-  | LineBlock
-  | PageBreakBlock
+  | (SpacerBlock & ResolvedBlockMeta)
+  | (LineBlock & ResolvedBlockMeta)
+  | (PageBreakBlock & ResolvedBlockMeta)
 
 export type ResolvedPageNumber = Required<NonNullable<DocumentDef['pageNumber']>>
 
@@ -74,6 +81,30 @@ export interface ResolvedDocument extends Omit<DocumentDef, 'blocks' | 'pageNumb
   pageNumber: ResolvedPageNumber
   hasExplicitPageNumber: boolean
   blocks: ResolvedBlock[]
+}
+
+export function withBlockMeta<T extends object>(
+  block: T,
+  src?: string,
+  inst?: string,
+): T {
+  if (src !== undefined) {
+    Object.defineProperty(block, '$src', {
+      value: src,
+      enumerable: false,
+      configurable: true,
+      writable: true,
+    })
+  }
+  if (inst !== undefined && inst.length > 0) {
+    Object.defineProperty(block, '$inst', {
+      value: inst,
+      enumerable: false,
+      configurable: true,
+      writable: true,
+    })
+  }
+  return block
 }
 
 const ANCHORED_URL_RE = /^https?:\/\/\S{1,2048}$/i
@@ -189,6 +220,7 @@ export function bindDocument(
     scope: Record<string, unknown>,
     path: string,
     depth = 0,
+    inst = '',
   ): ResolvedCell {
     const { blocks, text, ...rest } = cell
     const out: ResolvedCell = { ...rest }
@@ -196,7 +228,7 @@ export function bindDocument(
       out.text = bindStr(text, scope, `${path}.text`)
     }
     if (blocks !== undefined) {
-      out.blocks = bindBlocks(blocks, scope, `${path}.blocks`, depth + 1)
+      out.blocks = bindBlocks(blocks, scope, `${path}.blocks`, depth + 1, inst)
     }
     return out
   }
@@ -232,6 +264,7 @@ export function bindDocument(
     scope: Record<string, unknown>,
     basePath: string,
     depth = 0,
+    inst = '',
   ): ResolvedBlock[] {
     if (depth > 32) {
       throw new ApwPdfError(
@@ -263,7 +296,15 @@ export function bindDocument(
               [b.as]: arr[idx],
               $index: idx,
             }
-            out.push(...bindBlocks(b.blocks, childScope, `${path}.blocks`, depth + 1))
+            out.push(
+              ...bindBlocks(
+                b.blocks,
+                childScope,
+                `${path}.blocks`,
+                depth + 1,
+                `${inst}#${idx}`,
+              ),
+            )
           }
           break
         }
@@ -271,9 +312,9 @@ export function bindDocument(
           const expr = parseExpression(b.test, `${path}.test`)
           const cond = Boolean(evaluate(expr, scope))
           if (cond) {
-            out.push(...bindBlocks(b.then, scope, `${path}.then`, depth + 1))
+            out.push(...bindBlocks(b.then, scope, `${path}.then`, depth + 1, inst))
           } else if (b.else) {
-            out.push(...bindBlocks(b.else, scope, `${path}.else`, depth + 1))
+            out.push(...bindBlocks(b.else, scope, `${path}.else`, depth + 1, inst))
           }
           break
         }
@@ -286,27 +327,39 @@ export function bindDocument(
           if (runs !== undefined) {
             rp.runs = runs.map((r, rIdx) => bindInline(r, scope, `${path}.runs[${rIdx}]`))
           }
-          out.push(rp)
+          out.push(withBlockMeta(rp, path, inst))
           break
         }
         case 'image': {
-          out.push({
-            ...b,
-            src: bindStr(b.src, scope, `${path}.src`, 'arabic'),
-          })
+          out.push(
+            withBlockMeta(
+              {
+                ...b,
+                src: bindStr(b.src, scope, `${path}.src`, 'arabic'),
+              },
+              path,
+              inst,
+            ),
+          )
           break
         }
         case 'table': {
           const header = b.header?.map((row, rIdx) =>
-            row.map((c, cIdx) => bindCell(c, scope, `${path}.header[${rIdx}][${cIdx}]`, depth + 1)),
+            row.map((c, cIdx) =>
+              bindCell(c, scope, `${path}.header[${rIdx}][${cIdx}]`, depth + 1, inst),
+            ),
           )
           const footer = b.footer?.map((row, rIdx) =>
-            row.map((c, cIdx) => bindCell(c, scope, `${path}.footer[${rIdx}][${cIdx}]`, depth + 1)),
+            row.map((c, cIdx) =>
+              bindCell(c, scope, `${path}.footer[${rIdx}][${cIdx}]`, depth + 1, inst),
+            ),
           )
           let rows: ResolvedCell[][]
           if (Array.isArray(b.rows)) {
             rows = b.rows.map((row, rIdx) =>
-              row.map((c, cIdx) => bindCell(c, scope, `${path}.rows[${rIdx}][${cIdx}]`, depth + 1)),
+              row.map((c, cIdx) =>
+                bindCell(c, scope, `${path}.rows[${rIdx}][${cIdx}]`, depth + 1, inst),
+              ),
             )
           } else {
             const arr = resolveArray(b.rows.each, scope, `${path}.rows.each`)
@@ -327,28 +380,52 @@ export function bindDocument(
               }
               rows.push(
                 b.rows.cells.map((c, cIdx) =>
-                  bindCell(c, rowScope, `${path}.rows.cells[${cIdx}]`, depth + 1),
+                  bindCell(
+                    c,
+                    rowScope,
+                    `${path}.rows.cells[${cIdx}]`,
+                    depth + 1,
+                    `${inst}#${idx}`,
+                  ),
                 ),
               )
             }
           }
-          out.push({
-            ...b,
-            header,
-            rows,
-            footer,
-          })
+          out.push(
+            withBlockMeta(
+              {
+                ...b,
+                header,
+                rows,
+                footer,
+              },
+              path,
+              inst,
+            ),
+          )
           break
         }
         case 'columns': {
-          out.push({
-            ...b,
-            columns: b.columns.map((col, cIdx) => ({
-              width: col.width,
-              ...(col.align ? { align: col.align } : {}),
-              blocks: bindBlocks(col.blocks, scope, `${path}.columns[${cIdx}].blocks`, depth + 1),
-            })),
-          })
+          out.push(
+            withBlockMeta(
+              {
+                ...b,
+                columns: b.columns.map((col, cIdx) => ({
+                  width: col.width,
+                  ...(col.align ? { align: col.align } : {}),
+                  blocks: bindBlocks(
+                    col.blocks,
+                    scope,
+                    `${path}.columns[${cIdx}].blocks`,
+                    depth + 1,
+                    inst,
+                  ),
+                })),
+              },
+              path,
+              inst,
+            ),
+          )
           break
         }
         case 'signature': {
@@ -386,13 +463,13 @@ export function bindDocument(
             }
             sig.positions = boundPositions
           }
-          out.push(sig)
+          out.push(withBlockMeta(sig, path, inst))
           break
         }
         case 'spacer':
         case 'line':
         case 'pageBreak':
-          out.push(b)
+          out.push(withBlockMeta({ ...b }, path, inst))
           break
       }
     }
