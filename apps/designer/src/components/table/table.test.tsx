@@ -63,6 +63,11 @@ function createMockEditorState(
     setData: vi.fn((next) => {
       state.data = next
     }),
+    undo: vi.fn(),
+    redo: vi.fn(),
+    canUndo: false,
+    canRedo: false,
+    insertBlocks: vi.fn(),
     warnings: [],
   }
   return state

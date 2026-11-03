@@ -44,6 +44,11 @@ function createMockEditorState(
     updateBlock: vi.fn(),
     replaceBlock: vi.fn(),
     setData: vi.fn(),
+    undo: vi.fn(),
+    redo: vi.fn(),
+    canUndo: false,
+    canRedo: false,
+    insertBlocks: vi.fn(),
     warnings,
   }
 }
@@ -220,6 +225,53 @@ describe('OutlineTree', () => {
 
     fireEvent.keyDown(searchInput, { key: 'Enter' })
     expect(onInsert).toHaveBeenCalledWith('table')
+  })
+
+  it('QuickAdd shows สำเร็จรูป and calls onInsertPreset("itemsTable")', () => {
+    const onInsert = vi.fn()
+    const onInsertPreset = vi.fn()
+    const { getByText, getByRole } = render(
+      <QuickAdd onInsert={onInsert} onInsertPreset={onInsertPreset} />,
+    )
+
+    expect(getByText('สำเร็จรูป')).not.toBeNull()
+    const itemBtn = getByRole('menuitem', { name: 'ตารางรายการพร้อมยอดรวม' })
+    fireEvent.click(itemBtn)
+    expect(onInsertPreset).toHaveBeenCalledWith('itemsTable')
+  })
+
+  it('OutlineTree inserts preset after selected block or at root end when nothing is selected', () => {
+    const doc = createDoc([
+      { type: 'paragraph', text: 'First' },
+      { type: 'paragraph', text: 'Second' },
+    ])
+    const state = createMockEditorState(doc, ['blocks', 0])
+    const { getByRole, rerender } = render(<OutlineTree state={state} />)
+
+    fireEvent.click(getByRole('button', { name: '+ เพิ่ม' }))
+    fireEvent.click(getByRole('menuitem', { name: 'บล็อกอนุมัติ 2 ฝั่ง' }))
+
+    expect(state.insertBlocks).toHaveBeenCalledTimes(1)
+    expect(state.insertBlocks).toHaveBeenCalledWith(
+      ['blocks'],
+      1,
+      expect.any(Array),
+      expect.objectContaining({ left: expect.any(Object), right: expect.any(Object) }),
+    )
+
+    // When nothing is selected, inserts at the end of root blocks (index 2)
+    const stateUnselected = createMockEditorState(doc, null)
+    rerender(<OutlineTree state={stateUnselected} />)
+    fireEvent.click(getByRole('button', { name: '+ เพิ่ม' }))
+    fireEvent.click(getByRole('menuitem', { name: 'ตารางรายการพร้อมยอดรวม' }))
+
+    expect(stateUnselected.insertBlocks).toHaveBeenCalledTimes(1)
+    expect(stateUnselected.insertBlocks).toHaveBeenCalledWith(
+      ['blocks'],
+      2,
+      expect.any(Array),
+      expect.objectContaining({ items: expect.any(Array), total: 2150 }),
+    )
   })
 
   it('unresolved binding shows a warning dot', () => {

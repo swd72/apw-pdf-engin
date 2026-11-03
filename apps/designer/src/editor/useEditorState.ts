@@ -16,6 +16,7 @@ import {
 import { BLOCK_TYPES } from './blockCatalog.js'
 import { unresolved, type Binding } from './bindings.js'
 import { createHistory } from './history.js'
+import { mergeSampleData } from './presets.js'
 
 export interface EditorState {
   doc: DocumentDef
@@ -23,6 +24,12 @@ export interface EditorState {
   selectedPath: BlockPath | null
   select(path: BlockPath | null): void
   addBlock(listPath: BlockPath, index: number, type: Block['type']): void
+  insertBlocks(
+    listPath: BlockPath,
+    index: number,
+    blocks: Block[],
+    sampleData?: Record<string, unknown>,
+  ): void
   removeSelected(): void
   moveSelected(delta: -1 | 1): void
   moveSelectedInto(targetListPath: BlockPath): void
@@ -71,6 +78,29 @@ function getIn(obj: unknown, path: BlockPath): unknown {
     curr = curr[seg]
   }
   return curr
+}
+
+function usesGarudaAsset(blocks: Block[]): boolean {
+  for (const b of blocks) {
+    if (b.type === 'image' && b.src === 'asset:garuda') return true
+    if (b.type === 'columns' && Array.isArray(b.columns)) {
+      for (const col of b.columns) {
+        if (Array.isArray(col.blocks) && usesGarudaAsset(col.blocks)) return true
+      }
+    }
+    if (
+      b.type === 'each' &&
+      Array.isArray(b.blocks) &&
+      usesGarudaAsset(b.blocks)
+    ) {
+      return true
+    }
+    if (b.type === 'if') {
+      if (Array.isArray(b.then) && usesGarudaAsset(b.then)) return true
+      if (Array.isArray(b.else) && usesGarudaAsset(b.else)) return true
+    }
+  }
+  return false
 }
 
 export function useEditorState(
@@ -178,6 +208,39 @@ export function useEditorState(
         setSelectedPath(newPath)
         commit(nextDoc, dataRef.current)
       }
+    },
+    [commit, setSelectedPath],
+  )
+
+  const insertBlocks = useCallback(
+    (
+      listPath: BlockPath,
+      index: number,
+      blocks: Block[],
+      sampleData?: Record<string, unknown>,
+    ) => {
+      if (!Array.isArray(blocks) || blocks.length === 0) return
+      const currentDoc = docRef.current
+      let nextDoc = currentDoc
+      for (let i = 0; i < blocks.length; i++) {
+        nextDoc = insertBlock(nextDoc, listPath, index + i, blocks[i]!)
+      }
+      if (nextDoc === currentDoc) return
+
+      if (usesGarudaAsset(blocks) && !nextDoc.assets?.garuda) {
+        nextDoc = {
+          ...nextDoc,
+          assets: { ...nextDoc.assets, garuda: 'asset:garuda' },
+        }
+      }
+
+      const currentData = dataRef.current
+      const nextData = sampleData
+        ? mergeSampleData(currentData, sampleData)
+        : currentData
+
+      setSelectedPath([...listPath, index])
+      commit(nextDoc, nextData)
     },
     [commit, setSelectedPath],
   )
@@ -369,6 +432,7 @@ export function useEditorState(
     selectedPath,
     select,
     addBlock,
+    insertBlocks,
     removeSelected,
     moveSelected,
     moveSelectedInto,

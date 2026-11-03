@@ -6,6 +6,7 @@ import {
   canMoveInto,
   type BlockPath,
 } from '../../editor/docModel.js'
+import { PRESETS, type PresetDescriptor } from '../../editor/presets.js'
 import { OutlineRow } from './OutlineRow.js'
 import { QuickAdd } from './QuickAdd.js'
 
@@ -93,6 +94,7 @@ export function OutlineTree({
     selectedPath,
     select,
     addBlock,
+    insertBlocks,
     removeSelected,
     moveSelected,
     moveBlockTo,
@@ -134,6 +136,25 @@ export function OutlineTree({
       addBlock(ROOT_LIST_PATH, rootLen, type)
     },
     [selectedPath, doc, addBlock],
+  )
+
+  const handleInsertPreset = useCallback(
+    (id: PresetDescriptor['id']) => {
+      const preset = PRESETS.find((p) => p.id === id)
+      if (!preset) return
+      const blocks = preset.create()
+      if (selectedPath && selectedPath.length >= 2) {
+        const parentListPath = selectedPath.slice(0, -1)
+        const lastIdx = selectedPath[selectedPath.length - 1]
+        if (typeof lastIdx === 'number') {
+          insertBlocks(parentListPath, lastIdx + 1, blocks, preset.sampleData)
+          return
+        }
+      }
+      const rootLen = Array.isArray(doc?.blocks) ? doc.blocks.length : 0
+      insertBlocks(ROOT_LIST_PATH, rootLen, blocks, preset.sampleData)
+    },
+    [selectedPath, doc, insertBlocks],
   )
 
   const handleDragStartRow = useCallback(
@@ -432,6 +453,7 @@ export function OutlineTree({
             <div className="outline-panel__popover">
               <QuickAdd
                 onInsert={handleInsertBlock}
+                onInsertPreset={handleInsertPreset}
                 onClose={() => setQuickAddOpen(false)}
               />
             </div>
