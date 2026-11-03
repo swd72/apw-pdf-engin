@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react'
-import type { TemplateSummary, TemplateRecord } from '../server/templateStore.js'
+import type { DocumentDef } from '@apw-pdf/core'
+import { parseDocument } from '@apw-pdf/core'
+import { memo } from '@apw-pdf/templates'
+import type { TemplateSummary } from '../server/templateStore.js'
 import {
   listTemplates,
   getTemplate,
@@ -8,16 +11,22 @@ import {
   ApiError,
 } from './lib/api.js'
 import { validateDocumentText, validateJsonText, type Issue } from './lib/validate.js'
+import { docToText, textToDoc, buildSaveRecord } from './lib/editorSync.js'
 import { newTemplateRecord } from './lib/starter.js'
 import { TemplateList } from './components/TemplateList.js'
 import { JsonEditorPane } from './components/JsonEditorPane.js'
+import { VisualEditor } from './components/VisualEditor.js'
 import { PreviewPane } from './components/PreviewPane.js'
 import { UsageSnippet } from './components/UsageSnippet.js'
 
 export function App() {
   const [templates, setTemplates] = useState<TemplateSummary[]>([])
   const [selectedName, setSelectedName] = useState<string | null>(null)
+  const [topTab, setTopTab] = useState<'visual' | 'json'>('visual')
   const [activeTab, setActiveTab] = useState<'document' | 'example'>('document')
+
+  const [currentDoc, setCurrentDoc] = useState<DocumentDef>(memo.document)
+  const [currentData, setCurrentData] = useState<unknown>(memo.example ?? {})
 
   const [docText, setDocText] = useState('')
   const [exampleText, setExampleText] = useState('')
@@ -30,7 +39,7 @@ export function App() {
   const [isBuiltin, setIsBuiltin] = useState(false)
   const [isNew, setIsNew] = useState(false)
   const [description, setDescription] = useState('')
-  const [dataSchema, setDataSchema] = useState<object>({})
+  const [, setDataSchema] = useState<object>({})
 
   const [saveStatus, setSaveStatus] = useState<{
     type: 'idle' | 'saving' | 'success' | 'error'
@@ -66,8 +75,10 @@ export function App() {
       try {
         const record = await getTemplate(selectedName)
         if (cancelled) return
-        const dText = JSON.stringify(record.document, null, 2)
+        const dText = docToText(record.document as DocumentDef)
         const eText = JSON.stringify(record.example, null, 2)
+        setCurrentDoc(record.document as DocumentDef)
+        setCurrentData(record.example)
         setDocText(dText)
         setExampleText(eText)
         setValidDoc(record.document)
@@ -89,6 +100,23 @@ export function App() {
       cancelled = true
     }
   }, [selectedName, isNew])
+
+  // Stable handler for VisualEditor changes
+  const handleVisualChange = useCallback(
+    (next: { doc: DocumentDef; data: unknown }) => {
+      setCurrentDoc(next.doc)
+      setCurrentData(next.data)
+      try {
+        const parsed = parseDocument(next.doc)
+        setValidDoc(parsed)
+        setDocIssues([])
+      } catch {
+        setValidDoc(null)
+      }
+      setValidData(next.data)
+    },
+    [],
+  )
 
   // Debounced validate docText (400ms)
   const docTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -124,6 +152,71 @@ export function App() {
     }, 400)
   }
 
+  // Switching between Visual and JSON tabs
+  const handleSwitchTopTab = (mode: 'visual' | 'json') => {
+    if (mode === topTab) return
+
+    if (mode === 'json') {
+      // Visual -> JSON: always succeeds (pretty-print the doc text even if schema-invalid)
+      const text = docToText(currentDoc)
+      const exText = JSON.stringify(currentData, null, 2)
+      setDocText(text)
+      setExampleText(exText)
+
+      const docRes = textToDoc(text)
+      if (!docRes.ok) {
+        setDocIssues(docRes.issues)
+      } else {
+        setDocIssues([])
+      }
+
+      const exRes = validateJsonText(exText)
+      if (!exRes.ok) {
+        setExampleIssues(exRes.issues)
+      } else {
+        setExampleIssues([])
+      }
+
+      setTopTab('json')
+    } else {
+      // JSON -> Visual: only if textToDoc passes and the example JSON parses;
+      // otherwise stay on JSON and show the issues.
+      const docRes = textToDoc(docText)
+      const exRes = validateJsonText(exampleText)
+
+      let hasError = false
+      if (!docRes.ok) {
+        setDocIssues(docRes.issues)
+        setActiveTab('document')
+        hasError = true
+      } else {
+        setDocIssues([])
+      }
+
+      if (!exRes.ok) {
+        setExampleIssues(exRes.issues)
+        if (!hasError) {
+          setActiveTab('example')
+        }
+        hasError = true
+      } else {
+        setExampleIssues([])
+      }
+
+      if (hasError) {
+        return
+      }
+
+      setCurrentDoc(docRes.doc)
+      setCurrentData(exRes.value)
+      setValidDoc(docRes.doc)
+      setValidData(exRes.value)
+      setDocIssues([])
+      setExampleIssues([])
+      setTopTab('visual')
+    }
+  }
+
   // Actions
   const handleNew = () => {
     const raw = window.prompt('Enter new template name (a-z, 0-9, dashes):')
@@ -136,7 +229,9 @@ export function App() {
       setIsBuiltin(false)
       setDescription(starter.description)
       setDataSchema(starter.dataSchema)
-      setDocText(JSON.stringify(starter.document, null, 2))
+      setCurrentDoc(starter.document as DocumentDef)
+      setCurrentData(starter.example)
+      setDocText(docToText(starter.document as DocumentDef))
       setExampleText(JSON.stringify(starter.example, null, 2))
       setValidDoc(starter.document)
       setValidData(starter.example)
@@ -155,19 +250,26 @@ export function App() {
 
     let docObj: unknown
     let exampleObj: unknown
-    try {
-      docObj = JSON.parse(docText)
-      exampleObj = JSON.parse(exampleText)
-    } catch {
-      alert('Cannot duplicate: template JSON is invalid')
-      return
+    if (topTab === 'visual') {
+      docObj = JSON.parse(JSON.stringify(currentDoc))
+      exampleObj = JSON.parse(JSON.stringify(currentData))
+    } else {
+      try {
+        docObj = JSON.parse(docText)
+        exampleObj = JSON.parse(exampleText)
+      } catch {
+        alert('Cannot duplicate: template JSON is invalid')
+        return
+      }
     }
 
     setSelectedName(name)
     setIsNew(true)
     setIsBuiltin(false)
     setDescription(`Copy of ${baseName}`)
-    setDocText(JSON.stringify(docObj, null, 2))
+    setCurrentDoc(docObj as DocumentDef)
+    setCurrentData(exampleObj)
+    setDocText(docToText(docObj as DocumentDef))
     setExampleText(JSON.stringify(exampleObj, null, 2))
     setValidDoc(docObj)
     setValidData(exampleObj)
@@ -203,17 +305,28 @@ export function App() {
       targetOverwrite = false
     }
 
-    let parsedDoc: unknown
-    let parsedExample: unknown
-    try {
-      parsedDoc = JSON.parse(docText)
-      parsedExample = JSON.parse(exampleText)
-    } catch (err: any) {
-      setSaveStatus({ type: 'error', message: 'Cannot save: JSON syntax error' })
-      return
+    let docToSave: unknown
+    let dataToSave: unknown
+    let docTextToValidate: string
+
+    if (topTab === 'visual') {
+      docToSave = currentDoc
+      dataToSave = currentData
+      docTextToValidate = docToText(currentDoc)
+      setDocText(docTextToValidate)
+      setExampleText(JSON.stringify(currentData, null, 2))
+    } else {
+      try {
+        docToSave = JSON.parse(docText)
+        dataToSave = JSON.parse(exampleText)
+        docTextToValidate = docText
+      } catch (err: any) {
+        setSaveStatus({ type: 'error', message: 'Cannot save: JSON syntax error' })
+        return
+      }
     }
 
-    const docVal = validateDocumentText(docText)
+    const docVal = validateDocumentText(docTextToValidate)
     if (!docVal.ok) {
       setDocIssues(docVal.issues)
       setSaveStatus({
@@ -223,13 +336,12 @@ export function App() {
       return
     }
 
-    const record: TemplateRecord = {
+    const record = buildSaveRecord({
       name: targetName,
       description: description || `Template ${targetName}`,
-      document: parsedDoc,
-      dataSchema,
-      example: parsedExample,
-    }
+      doc: docToSave,
+      data: dataToSave,
+    })
 
     setSaveStatus({ type: 'saving' })
     try {
@@ -255,26 +367,28 @@ export function App() {
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '260px 1fr 1fr',
+        gridTemplateColumns: '220px minmax(0, 1fr) minmax(320px, 38%)',
         height: '100vh',
-        width: '100vw',
+        width: '100%',
         overflow: 'hidden',
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
       {/* Column 1: Template List */}
-      <TemplateList
-        templates={templates}
-        selectedName={selectedName}
-        onSelect={(name) => {
-          setIsNew(false)
-          setSelectedName(name)
-        }}
-        onNew={handleNew}
-        onDuplicate={handleDuplicate}
-        onDelete={handleDelete}
-      />
+      <div style={{ minWidth: 0, height: '100%', overflow: 'hidden' }}>
+        <TemplateList
+          templates={templates}
+          selectedName={selectedName}
+          onSelect={(name) => {
+            setIsNew(false)
+            setSelectedName(name)
+          }}
+          onNew={handleNew}
+          onDuplicate={handleDuplicate}
+          onDelete={handleDelete}
+        />
+      </div>
 
       {/* Column 2: Editor Pane */}
       <div
@@ -282,6 +396,7 @@ export function App() {
           display: 'flex',
           flexDirection: 'column',
           height: '100%',
+          minWidth: 0,
           borderRight: '1px solid #dee2e6',
           background: '#fff',
           overflow: 'hidden',
@@ -298,67 +413,123 @@ export function App() {
             borderBottom: '1px solid #dee2e6',
           }}
         >
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <button
-              type="button"
-              onClick={() => setActiveTab('document')}
-              style={{
-                padding: '6px 12px',
-                fontSize: '13px',
-                fontWeight: activeTab === 'document' ? 600 : 400,
-                background: activeTab === 'document' ? '#fff' : 'transparent',
-                border:
-                  activeTab === 'document'
-                    ? '1px solid #dee2e6'
-                    : '1px solid transparent',
-                borderBottom: activeTab === 'document' ? 'none' : undefined,
-                borderRadius: '4px 4px 0 0',
-                cursor: 'pointer',
-              }}
-            >
-              document
-              {docIssues.length > 0 && (
-                <span
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <button
+                type="button"
+                onClick={() => handleSwitchTopTab('visual')}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '13px',
+                  fontWeight: topTab === 'visual' ? 600 : 400,
+                  background: topTab === 'visual' ? '#fff' : 'transparent',
+                  border:
+                    topTab === 'visual'
+                      ? '1px solid #dee2e6'
+                      : '1px solid transparent',
+                  borderBottom: topTab === 'visual' ? 'none' : undefined,
+                  borderRadius: '4px 4px 0 0',
+                  cursor: 'pointer',
+                }}
+              >
+                Visual
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchTopTab('json')}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '13px',
+                  fontWeight: topTab === 'json' ? 600 : 400,
+                  background: topTab === 'json' ? '#fff' : 'transparent',
+                  border:
+                    topTab === 'json'
+                      ? '1px solid #dee2e6'
+                      : '1px solid transparent',
+                  borderBottom: topTab === 'json' ? 'none' : undefined,
+                  borderRadius: '4px 4px 0 0',
+                  cursor: 'pointer',
+                }}
+              >
+                JSON
+                {(docIssues.length > 0 || exampleIssues.length > 0) && (
+                  <span
+                    style={{
+                      marginLeft: '6px',
+                      color: '#dc3545',
+                      fontWeight: 700,
+                    }}
+                  >
+                    ({docIssues.length + exampleIssues.length})
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {topTab === 'json' && (
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '4px',
+                  marginLeft: '8px',
+                  paddingLeft: '8px',
+                  borderLeft: '1px solid #dee2e6',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('document')}
                   style={{
-                    marginLeft: '6px',
-                    color: '#dc3545',
-                    fontWeight: 700,
+                    padding: '4px 8px',
+                    fontSize: '12px',
+                    fontWeight: activeTab === 'document' ? 600 : 400,
+                    background: activeTab === 'document' ? '#e9ecef' : 'transparent',
+                    border: '1px solid transparent',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
                   }}
                 >
-                  ({docIssues.length})
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('example')}
-              style={{
-                padding: '6px 12px',
-                fontSize: '13px',
-                fontWeight: activeTab === 'example' ? 600 : 400,
-                background: activeTab === 'example' ? '#fff' : 'transparent',
-                border:
-                  activeTab === 'example'
-                    ? '1px solid #dee2e6'
-                    : '1px solid transparent',
-                borderBottom: activeTab === 'example' ? 'none' : undefined,
-                borderRadius: '4px 4px 0 0',
-                cursor: 'pointer',
-              }}
-            >
-              example data
-              {exampleIssues.length > 0 && (
-                <span
+                  document
+                  {docIssues.length > 0 && (
+                    <span
+                      style={{
+                        marginLeft: '4px',
+                        color: '#dc3545',
+                        fontWeight: 700,
+                      }}
+                    >
+                      ({docIssues.length})
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('example')}
                   style={{
-                    marginLeft: '6px',
-                    color: '#dc3545',
-                    fontWeight: 700,
+                    padding: '4px 8px',
+                    fontSize: '12px',
+                    fontWeight: activeTab === 'example' ? 600 : 400,
+                    background: activeTab === 'example' ? '#e9ecef' : 'transparent',
+                    border: '1px solid transparent',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
                   }}
                 >
-                  ({exampleIssues.length})
-                </span>
-              )}
-            </button>
+                  example data
+                  {exampleIssues.length > 0 && (
+                    <span
+                      style={{
+                        marginLeft: '4px',
+                        color: '#dc3545',
+                        fontWeight: 700,
+                      }}
+                    >
+                      ({exampleIssues.length})
+                    </span>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -398,8 +569,14 @@ export function App() {
         </div>
 
         {/* Editor Body */}
-        <div style={{ flex: 1, overflow: 'hidden', padding: '8px' }}>
-          {activeTab === 'document' ? (
+        <div style={{ flex: 1, overflow: 'hidden', padding: topTab === 'visual' ? '0' : '8px' }}>
+          {topTab === 'visual' ? (
+            <VisualEditor
+              doc={currentDoc}
+              data={currentData}
+              onChange={handleVisualChange}
+            />
+          ) : activeTab === 'document' ? (
             <JsonEditorPane
               value={docText}
               onChange={handleDocChange}
@@ -416,8 +593,8 @@ export function App() {
           )}
         </div>
 
-        {/* Issues Tray */}
-        {currentIssues.length > 0 && (
+        {/* Issues Tray (in JSON tab) */}
+        {topTab === 'json' && currentIssues.length > 0 && (
           <div
             style={{
               maxHeight: '140px',
@@ -461,6 +638,7 @@ export function App() {
           display: 'flex',
           flexDirection: 'column',
           height: '100%',
+          minWidth: 0,
           overflow: 'hidden',
         }}
       >

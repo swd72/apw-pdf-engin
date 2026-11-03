@@ -98,6 +98,6 @@ Everything lives in `apps/designer/src/`. New modules (one responsibility each):
 
 ## Open items to verify during planning
 
-1. Does the engine evaluate any expression inside `{{ }}` beyond path + filters (needed for computed totals)? If not, totals stay data-side in B1.
-2. Does `renderPdf` expose block layout boxes (needed only for B3)?
-3. Confirm the list of filters against `packages/core` (spec text above is from the MCP guide).
+1. Resolved: `{{ }}` supports paths and filters only; `if.test` supports comparisons (`==`, `!=`, `<`, `>`, `<=`, `>=`), `&&`, `||`, `!`, with no arithmetic, so computed totals live in the data.
+2. Resolved: The engine exposes no block layout boxes, so B3 (click on paper) is dropped.
+3. Resolved: Filters are `Object.keys(FILTERS)` from `@apw-pdf/core`.

@@ -134,6 +134,24 @@ npx pnpm@9 --filter designer dev
 APW_PDF_TEMPLATE_DIR="C:/project/apw-pdf-engin/saved-templates" npx pnpm@9 --filter designer dev
 ```
 
+#### ฟีเจอร์หลัก (Key Features)
+
+- **Visual Editor (Visual tab)**: หน้าจอแก้ไขเทมเพลตเชิงภาพ ทำงานควบคู่กับพรีวิว PDF จากเอนจินจริงแบบเรียลไทม์:
+  - **Block Tree**: จัดการโครงสร้างบล็อกของเอกสาร (paragraph, table, columns, signature, image, spacer, line, pageBreak, each, if) เลื่อนลำดับขึ้น-ลง ย้ายเข้าหรือออกจากบล็อก container (nesting) คัดลอก และลบบล็อก พร้อมจุดแจ้งเตือนเมื่อมีการผูกตัวแปรที่ยังไม่สมบูรณ์
+  - **Free-form Data Panel**: สร้างและปรับแต่งโครงสร้างข้อมูล JSON ได้อย่างอิสระโดยไม่ต้องมี schema บังคับ เพิ่ม/แก้ไข/ลบคีย์ กำหนดประเภทข้อมูล (string, number, boolean, object, array) และเพิ่มรายการใน array ได้โดยตรง
+  - **Block Inspector**: ฟอร์มปรับแต่งค่าเฉพาะของแต่ละบล็อกอย่างละเอียด เช่น การจัดย่อหน้าแบบ `thaiDistributed`, การแบ่งคอลัมน์, โหมดวนลูปตาราง (`each`), บล็อกลายเซ็น พร้อมโหมดแก้ไข JSON รายบล็อก
+- **Variable Binding (`{{ }}`) & Filters**:
+  - เมื่อพิมพ์ `{{` ในช่องข้อความ ระบบจะแนะนำ path ของตัวแปรจาก Data Panel และ loop variables ในขอบเขตของบล็อกนั้นโดยอัตโนมัติ
+  - เมื่อพิมพ์ `|` จะแสดงรายชื่อตัวกรองมาตรฐานจาก `@apw-pdf/core` (`thaiDate`, `thaiNum`, `baht`, `number`, `prefix`, `default`, `upper`, `lower`)
+  - มีการแจ้งเตือน unresolved variables เมื่อมีการอ้างถึงตัวแปรที่ยังไม่มีอยู่ในข้อมูล
+- **Sync ระหว่าง Visual และ JSON Tab**:
+  - แก้ไขบน state เอกสารและข้อมูล (`doc` / `data`) ชุดเดียวกัน
+  - สลับจาก **Visual → JSON** ได้เสมอโดยจัดรูปแบบ Pretty JSON ให้ทันที แม้โครงสร้างเอกสารจะยังไม่ครบถ้วน
+  - สลับจาก **JSON → Visual** จะตรวจสอบความถูกต้องผ่าน `parseDocument` หาก JSON หรือ schema ไม่ถูกต้อง ระบบจะคงอยู่ที่แท็บ JSON และแสดงรายการ validation issues เพื่อให้แก้ไขก่อน
+- **Save Format**:
+  - บันทึกในรูปแบบ `TemplateRecord` มาตรฐาน (`name`, `description`, `document`, `dataSchema`, `example`)
+  - สร้าง `dataSchema` จากข้อมูลปัจจุบันให้อัตโนมัติผ่าน `inferJsonSchema(data)` และบันทึก `example` เป็นข้อมูลชุดปัจจุบัน เพื่อให้พร้อมใช้งานร่วมกับ MCP Server, CLI และ `@apw-pdf/react` ทันที
+
 ---
 
 ## คู่มือการเขียนเทมเพลต (Template Authoring Guide)
