@@ -270,6 +270,15 @@ export function SettingsIcon(props: IconProps = {}) {
   )
 }
 
+export function GuidesIcon(props: IconProps = {}) {
+  return (
+    <Svg {...props}>
+      <rect x="3.5" y="3" width="13" height="14" rx="1.5" />
+      <path d="M6.5 6h7v8h-7z" strokeDasharray="2 2" />
+    </Svg>
+  )
+}
+
 export const text = TextIcon
 export const table = TableIcon
 export const columns = ColumnsIcon

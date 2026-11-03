@@ -173,6 +173,8 @@ export function VisualEditor({
       data={stageData !== undefined ? stageData : state.data}
       templateName={selectedTemplate ?? 'template'}
       client={effectiveStageClient}
+      editor={state}
+      onEditJson={handleEditBlockJson}
     />
   )
 

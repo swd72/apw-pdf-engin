@@ -3,6 +3,7 @@ import {
   ApwPdfProvider,
   PdfDownloadButton,
   PdfPreview,
+  type PdfPreviewProps,
   type RenderClient,
 } from '@apw-pdf/react'
 import { pageSizePt } from './stage/zoom.js'
@@ -43,6 +44,8 @@ export interface PreviewPagesProps {
   effectiveData: unknown
   scale: number
   onPageCountChange?: (count: number) => void
+  renderOverlay?: PdfPreviewProps['renderOverlay']
+  onPagesChange?: PdfPreviewProps['onPagesChange']
 }
 
 export function PreviewPages({
@@ -50,6 +53,8 @@ export function PreviewPages({
   effectiveData,
   scale,
   onPageCountChange,
+  renderOverlay,
+  onPagesChange,
 }: PreviewPagesProps) {
   if (!effectiveDoc) {
     return <div className="pdf-stage__empty">ยังไม่มีเทมเพลต</div>
@@ -79,6 +84,8 @@ export function PreviewPages({
         className="pdf-stage__pages"
         pageClassName="pdf-stage__page"
         onPageCountChange={onPageCountChange}
+        renderOverlay={renderOverlay}
+        onPagesChange={onPagesChange}
       />
     </div>
   )

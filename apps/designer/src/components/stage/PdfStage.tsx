@@ -5,11 +5,15 @@ import React, {
   useMemo,
   useCallback,
 } from 'react'
+import type { PageInfo } from '@apw-pdf/core'
 import {
   ApwPdfProvider,
   PdfDownloadButton,
+  type PdfPreviewProps,
   type RenderClient,
 } from '@apw-pdf/react'
+import type { EditorState } from '../../editor/useEditorState.js'
+import type { BlockPath } from '../../editor/docModel.js'
 import { IconButton } from '../../ui/IconButton.js'
 import { Menu, type MenuItem } from '../../ui/Menu.js'
 import {
@@ -17,6 +21,7 @@ import {
   MinusIcon,
   FitWidthIcon,
   DownloadIcon,
+  GuidesIcon,
 } from '../../ui/icons.js'
 import {
   PREVIEW_ASSETS,
@@ -31,14 +36,39 @@ import {
   ZOOM_PRESETS,
   type ZoomMode,
 } from './zoom.js'
+import { StageOverlay } from './StageOverlay.js'
+import { pathKey, resolveSelection } from './sourcePath.js'
 
 export { STAGE_PADDING }
+
+const GUIDES_STORAGE_KEY = 'apw-designer-guides'
+
+function readGuidesPref(): boolean {
+  try {
+    const v = window.localStorage.getItem(GUIDES_STORAGE_KEY)
+    if (v === '0') return false
+    if (v === '1') return true
+  } catch {
+    // ignore storage errors
+  }
+  return true
+}
+
+function writeGuidesPref(show: boolean): void {
+  try {
+    window.localStorage.setItem(GUIDES_STORAGE_KEY, show ? '1' : '0')
+  } catch {
+    // ignore storage errors
+  }
+}
 
 export interface PdfStageProps {
   doc: unknown | null
   data: unknown | null
   templateName?: string
   client?: RenderClient
+  editor?: EditorState
+  onEditJson?(path: BlockPath): void
 }
 
 export function PdfStage({
@@ -46,6 +76,8 @@ export function PdfStage({
   data,
   templateName = 'template',
   client,
+  editor,
+  onEditJson,
 }: PdfStageProps) {
   const { effectiveDoc, effectiveData } = useLastGoodPreview(doc, data)
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -57,8 +89,25 @@ export function PdfStage({
   } | null>(null)
   const [pageCount, setPageCount] = useState(1)
   const [currentPage, setCurrentPage] = useState(1)
+  const [pages, setPages] = useState<PageInfo[]>([])
+  const pendingPagesRef = useRef<PageInfo[] | null>(null)
+  const [showGuides, setShowGuides] = useState<boolean>(() => readGuidesPref())
+  const selectedFromOverlayRef = useRef<string | null>(null)
+  const lastScrolledKeyRef = useRef<string | null>(null)
 
   const pageSize = useMemo(() => pageSizePt(effectiveDoc), [effectiveDoc])
+
+  const handleToggleGuides = useCallback(() => {
+    setShowGuides((prev) => {
+      const next = !prev
+      writeGuidesPref(next)
+      return next
+    })
+  }, [])
+
+  const handleSelectFromOverlay = useCallback((path: BlockPath | null) => {
+    selectedFromOverlayRef.current = path ? pathKey(path) : '__null__'
+  }, [])
 
   const measureContainer = useCallback(
     (entry?: ResizeObserverEntry) => {
@@ -97,6 +146,19 @@ export function PdfStage({
       measureContainer()
     },
     [measureContainer],
+  )
+
+  const handlePagesChange = useCallback(
+    (nextPages: PageInfo[]) => {
+      pendingPagesRef.current = nextPages
+      const canvasCount =
+        scrollRef.current?.querySelectorAll('canvas').length ?? 0
+      const expectedCount = canvasCount > 0 ? canvasCount : pageCount
+      if (nextPages.length === expectedCount) {
+        setPages((prev) => (prev === nextPages ? prev : nextPages))
+      }
+    },
+    [pageCount],
   )
 
   const trackedClient = useMemo<RenderClient | undefined>(() => {
@@ -157,6 +219,10 @@ export function PdfStage({
       const count = el.querySelectorAll('canvas').length
       if (count > 0) {
         handlePageCountChange(count)
+        const pending = pendingPagesRef.current
+        if (pending && pending.length === count) {
+          setPages((prev) => (prev === pending ? prev : pending))
+        }
       }
       measureContainer()
     }
@@ -185,6 +251,105 @@ export function PdfStage({
 
   const effectivePercent = Math.round(scale * 100)
 
+  const selectedKey = editor?.selectedPath ? pathKey(editor.selectedPath) : ''
+
+  const firstSelectedPageIndex = useMemo(() => {
+    if (!editor || !selectedKey) return -1
+    for (let pIdx = 0; pIdx < pages.length; pIdx++) {
+      const p = pages[pIdx]!
+      for (const b of p.boxes) {
+        const resolved = resolveSelection(editor.doc, b.path)
+        if (resolved && pathKey(resolved.blockPath) === selectedKey) {
+          return pIdx
+        }
+      }
+    }
+    return -1
+  }, [editor?.doc, selectedKey, pages])
+
+  useEffect(() => {
+    if (!editor || !selectedKey) {
+      lastScrolledKeyRef.current = null
+      selectedFromOverlayRef.current = null
+      return
+    }
+    if (selectedFromOverlayRef.current === selectedKey) {
+      lastScrolledKeyRef.current = selectedKey
+      selectedFromOverlayRef.current = null
+      return
+    }
+    if (lastScrolledKeyRef.current === selectedKey) {
+      return
+    }
+
+    let matchPageIdx = -1
+    let matchBox: { y: number; h: number } | null = null
+    for (let pIdx = 0; pIdx < pages.length; pIdx++) {
+      const p = pages[pIdx]!
+      for (const b of p.boxes) {
+        const resolved = resolveSelection(editor.doc, b.path)
+        if (resolved && pathKey(resolved.blockPath) === selectedKey) {
+          matchPageIdx = pIdx
+          matchBox = b
+          break
+        }
+      }
+      if (matchBox) break
+    }
+
+    if (!matchBox || matchPageIdx < 0) return
+    lastScrolledKeyRef.current = selectedKey
+
+    const el = scrollRef.current
+    if (!el) return
+    const wrappers = el.querySelectorAll<HTMLElement>('.apw-pdf-page')
+    const pageEls =
+      wrappers.length > 0
+        ? wrappers
+        : el.querySelectorAll<HTMLElement>('canvas')
+    const pageEl = pageEls[matchPageIdx]
+    if (!pageEl) return
+
+    const boxTop = pageEl.offsetTop + matchBox.y * scale
+    const boxBottom = boxTop + matchBox.h * scale
+    const viewTop = el.scrollTop
+    const viewBottom = viewTop + el.clientHeight
+
+    if (boxTop < viewTop || (el.clientHeight > 0 && boxBottom > viewBottom)) {
+      el.scrollTop = Math.max(0, boxTop - 24)
+    }
+  }, [editor?.doc, selectedKey, pages, scale])
+
+  const renderOverlay = useCallback<
+    NonNullable<PdfPreviewProps['renderOverlay']>
+  >(
+    (pageIndex: number, overlayScale: number, _page: PageInfo) => {
+      if (!editor) return null
+      const activePage = pages[pageIndex]
+      if (!activePage) return null
+      return (
+        <StageOverlay
+          pageIndex={pageIndex}
+          scale={overlayScale}
+          page={activePage}
+          editor={editor}
+          showGuides={showGuides}
+          showToolbar={pageIndex === firstSelectedPageIndex}
+          onEditJson={onEditJson}
+          onSelectFromOverlay={handleSelectFromOverlay}
+        />
+      ) as ReturnType<NonNullable<PdfPreviewProps['renderOverlay']>>
+    },
+    [
+      editor,
+      pages,
+      showGuides,
+      firstSelectedPageIndex,
+      onEditJson,
+      handleSelectFromOverlay,
+    ],
+  )
+
   const handleZoomIn = useCallback(() => {
     setMode((prev) => {
       const current =
@@ -208,14 +373,18 @@ export function PdfStage({
   const handleScroll = useCallback(() => {
     const el = scrollRef.current
     if (!el) return
-    const canvases = el.querySelectorAll('canvas')
-    if (canvases.length === 0) return
+    const wrappers = el.querySelectorAll<HTMLElement>('.apw-pdf-page')
+    const items =
+      wrappers.length > 0
+        ? wrappers
+        : el.querySelectorAll<HTMLElement>('canvas')
+    if (items.length === 0) return
 
     const threshold = el.scrollTop + el.clientHeight * 0.35
     let active = 1
-    for (let i = 0; i < canvases.length; i++) {
-      const c = canvases[i]!
-      if (c.offsetTop <= threshold) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]!
+      if (item.offsetTop <= threshold) {
         active = i + 1
       } else {
         break
@@ -265,6 +434,8 @@ export function PdfStage({
             effectiveData={effectiveData}
             scale={scale}
             onPageCountChange={handlePageCountChange}
+            renderOverlay={editor ? renderOverlay : undefined}
+            onPagesChange={editor ? handlePagesChange : undefined}
           />
         </div>
 
@@ -295,6 +466,12 @@ export function PdfStage({
             icon={<FitWidthIcon />}
             active={mode.kind === 'fit-width'}
             onClick={handleFitWidth}
+          />
+          <IconButton
+            label="เส้นขอบกระดาษ"
+            icon={<GuidesIcon />}
+            active={showGuides}
+            onClick={handleToggleGuides}
           />
 
           <span className="pdf-stage__divider" aria-hidden="true" />
