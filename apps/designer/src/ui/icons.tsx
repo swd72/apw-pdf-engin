@@ -227,6 +227,49 @@ export function DownloadIcon(props: IconProps = {}) {
   )
 }
 
+export function ChevronDownIcon(props: IconProps = {}) {
+  return (
+    <Svg {...props}>
+      <path d="M5.5 7.5L10 12l4.5-4.5" />
+    </Svg>
+  )
+}
+
+export function ChevronRightIcon(props: IconProps = {}) {
+  return (
+    <Svg {...props}>
+      <path d="M7.5 5.5L12 10l-4.5 4.5" />
+    </Svg>
+  )
+}
+
+export function ResetIcon(props: IconProps = {}) {
+  return (
+    <Svg {...props}>
+      <path d="M5.5 5.5l9 9" />
+      <path d="M14.5 5.5l-9 9" />
+    </Svg>
+  )
+}
+
+export function BracesIcon(props: IconProps = {}) {
+  return (
+    <Svg {...props}>
+      <path d="M7 4c-1.5 0-2 .8-2 2v2c0 1-.8 2-2 2 1.2 0 2 1 2 2v2c0 1.2.5 2 2 2" />
+      <path d="M13 4c1.5 0 2 .8 2 2v2c0 1 .8 2 2 2-1.2 0-2 1-2 2v2c0 1.2-.5 2-2 2" />
+    </Svg>
+  )
+}
+
+export function SettingsIcon(props: IconProps = {}) {
+  return (
+    <Svg {...props}>
+      <circle cx="10" cy="10" r="2.5" />
+      <path d="M10 3.5v2M10 14.5v2M3.5 10h2M14.5 10h2M5.4 5.4l1.4 1.4M13.2 13.2l1.4 1.4M14.6 5.4l-1.4 1.4M6.8 13.2l-1.4 1.4" />
+    </Svg>
+  )
+}
+
 export const text = TextIcon
 export const table = TableIcon
 export const columns = ColumnsIcon
@@ -247,6 +290,11 @@ export const copy = CopyIcon
 export const minus = MinusIcon
 export const fitWidth = FitWidthIcon
 export const download = DownloadIcon
+export const chevronDown = ChevronDownIcon
+export const chevronRight = ChevronRightIcon
+export const reset = ResetIcon
+export const braces = BracesIcon
+export const settings = SettingsIcon
 
 export const icons = {
   text: TextIcon,
@@ -269,4 +317,9 @@ export const icons = {
   minus: MinusIcon,
   fitWidth: FitWidthIcon,
   download: DownloadIcon,
+  chevronDown: ChevronDownIcon,
+  chevronRight: ChevronRightIcon,
+  reset: ResetIcon,
+  braces: BracesIcon,
+  settings: SettingsIcon,
 }
