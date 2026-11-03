@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Warning } from '@apw-pdf/core'
+import type { PageInfo, Warning } from '@apw-pdf/core'
 import { useRenderClient } from './provider.js'
 
 export interface UsePdfOptions {
   debounceMs?: number
   strict?: boolean
+  boxes?: boolean
 }
 
 export interface UsePdfState {
@@ -12,6 +13,7 @@ export interface UsePdfState {
   url?: string
   bytes?: Uint8Array
   pageCount?: number
+  pages?: PageInfo[]
   warnings: Warning[]
   error?: {
     code: string
@@ -28,6 +30,7 @@ export function usePdf(
   const client = useRenderClient()
   const debounceMs = opts?.debounceMs ?? 300
   const strict = opts?.strict
+  const boxes = opts?.boxes
 
   const [state, setState] = useState<UsePdfState>({
     status: 'idle',
@@ -57,7 +60,12 @@ export function usePdf(
       }))
 
       void client
-        .render({ doc, data, strict })
+        .render({
+          doc,
+          data,
+          strict,
+          ...(boxes ? { boxes: true } : {}),
+        })
         .then((res) => {
           if (seq !== reqSeqRef.current) return
 
@@ -76,6 +84,7 @@ export function usePdf(
               url: nextUrl,
               bytes: res.bytes,
               pageCount: res.pageCount,
+              pages: res.pages,
               warnings: res.warnings,
             })
           } else {
@@ -102,7 +111,7 @@ export function usePdf(
     return () => {
       clearTimeout(timer)
     }
-  }, [client, doc, data, debounceMs, strict])
+  }, [client, doc, data, debounceMs, strict, boxes])
 
   return state
 }

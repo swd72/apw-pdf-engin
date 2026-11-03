@@ -42,6 +42,7 @@ export async function handleMessage(
     const engine = await getOrCreateEngine(cfg)
     const result = await engine.renderPdf(req.doc, req.data, {
       strict: req.strict,
+      ...(req.boxes ? { boxes: true } : {}),
     })
     return {
       id: req.id,
@@ -49,6 +50,7 @@ export async function handleMessage(
       bytes: result.bytes,
       pageCount: result.pageCount,
       warnings: result.warnings,
+      ...(result.pages !== undefined ? { pages: result.pages } : {}),
     }
   } catch (err) {
     if (err instanceof ApwPdfError) {

@@ -1,3 +1,4 @@
+export type { BlockBox, PageInfo, Rect } from '@apw-pdf/core'
 export * from './protocol.js'
 export * from './fetch-providers.js'
 export * from './provider.js'

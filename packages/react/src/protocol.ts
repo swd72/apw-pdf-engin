@@ -1,4 +1,4 @@
-import type { Warning } from '@apw-pdf/core'
+import type { PageInfo, Warning } from '@apw-pdf/core'
 
 export interface WorkerInitConfig {
   fontBaseUrl: string
@@ -11,6 +11,7 @@ export type RenderRequest = {
   doc: unknown
   data: unknown
   strict?: boolean
+  boxes?: boolean
   config?: WorkerInitConfig
 }
 
@@ -21,6 +22,7 @@ export type RenderResponse =
       bytes: Uint8Array
       pageCount: number
       warnings: Warning[]
+      pages?: PageInfo[]
     }
   | {
       id: number
