@@ -12,17 +12,15 @@ export interface PreviewPaneProps {
   scale?: number
   client?: RenderClient
   templateName?: string
+  onPageCountChange?: (count: number) => void
 }
 
-const PREVIEW_ASSETS = { garuda: '/assets/garuda-placeholder.png' }
+export const PREVIEW_ASSETS = { garuda: '/assets/garuda-placeholder.png' }
 
-export function PreviewPane({
-  doc,
-  data,
-  scale = 1,
-  client,
-  templateName = 'template',
-}: PreviewPaneProps) {
+export function useLastGoodPreview(doc: unknown | null, data: unknown | null): {
+  effectiveDoc: unknown | null
+  effectiveData: unknown
+} {
   const lastGoodDoc = useRef<unknown | null>(null)
   const lastGoodData = useRef<unknown | null>(null)
 
@@ -33,8 +31,53 @@ export function PreviewPane({
     lastGoodData.current = data
   }
 
-  const effectiveDoc = lastGoodDoc.current
-  const effectiveData = lastGoodData.current ?? {}
+  return {
+    effectiveDoc: lastGoodDoc.current,
+    effectiveData: lastGoodData.current ?? {},
+  }
+}
+
+export interface PreviewPagesProps {
+  effectiveDoc: unknown | null
+  effectiveData: unknown
+  scale: number
+  onPageCountChange?: (count: number) => void
+}
+
+export function PreviewPages({
+  effectiveDoc,
+  effectiveData,
+  scale,
+  onPageCountChange,
+}: PreviewPagesProps) {
+  if (!effectiveDoc) {
+    return <div className="pdf-stage__empty">ยังไม่มีเทมเพลต</div>
+  }
+
+  return (
+    <div className="pdf-stage__sheet-wrap" data-testid="pdf-stage-pages">
+      <PdfPreview
+        doc={effectiveDoc}
+        data={effectiveData}
+        scale={scale}
+        debounceMs={0}
+        className="pdf-stage__pages"
+        pageClassName="pdf-stage__page"
+        onPageCountChange={onPageCountChange}
+      />
+    </div>
+  )
+}
+
+export function PreviewPane({
+  doc,
+  data,
+  scale = 1,
+  client,
+  templateName = 'template',
+  onPageCountChange,
+}: PreviewPaneProps) {
+  const { effectiveDoc, effectiveData } = useLastGoodPreview(doc, data)
 
   return (
     <ApwPdfProvider
@@ -44,75 +87,27 @@ export function PreviewPane({
       worker={client ? undefined : true}
       client={client}
     >
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          overflow: 'hidden',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '8px 12px',
-            background: '#f1f3f5',
-            borderBottom: '1px solid #dee2e6',
-          }}
-        >
-          <div style={{ fontWeight: 600, fontSize: '14px' }}>PDF Preview</div>
-          {effectiveDoc && (
+      <div className="preview-pane">
+        <div className="preview-pane__header">
+          <div className="preview-pane__title">PDF Preview</div>
+          {effectiveDoc !== null && (
             <PdfDownloadButton
               doc={effectiveDoc}
               data={effectiveData}
               fileName={`${templateName}.pdf`}
-              style={{
-                padding: '6px 12px',
-                background: '#0d6efd',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '13px',
-              }}
+              className="ui-btn ui-btn--primary"
             >
               ดาวน์โหลด PDF
             </PdfDownloadButton>
           )}
         </div>
-        <div
-          style={{
-            flex: 1,
-            overflow: 'auto',
-            padding: '16px',
-            background: '#525659',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'flex-start',
-          }}
-        >
-          {effectiveDoc ? (
-            <div
-              style={{
-                boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
-                background: '#fff',
-                minHeight: '200px',
-              }}
-            >
-              <PdfPreview
-                doc={effectiveDoc}
-                data={effectiveData}
-                scale={scale}
-                debounceMs={0}
-              />
-            </div>
-          ) : (
-            <div style={{ color: '#ccc', marginTop: '40px' }}>
-              No template loaded
-            </div>
-          )}
+        <div className="pdf-stage__canvas">
+          <PreviewPages
+            effectiveDoc={effectiveDoc}
+            effectiveData={effectiveData}
+            scale={scale}
+            onPageCountChange={onPageCountChange}
+          />
         </div>
       </div>
     </ApwPdfProvider>

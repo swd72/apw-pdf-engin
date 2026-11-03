@@ -6,7 +6,9 @@ export interface PdfPreviewProps {
   data: unknown
   scale?: number
   className?: string
+  pageClassName?: string
   debounceMs?: number
+  onPageCountChange?: (pageCount: number) => void
 }
 
 export function PdfPreview({
@@ -14,12 +16,22 @@ export function PdfPreview({
   data,
   scale = 1,
   className,
+  pageClassName,
   debounceMs,
+  onPageCountChange,
 }: PdfPreviewProps) {
   const { bytes, pageCount, status, error } = usePdf(doc, data, { debounceMs })
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([])
   const activeRenderTaskRef = useRef<{ cancel: () => void; promise: Promise<unknown> } | null>(null)
   const activeLoadingTaskRef = useRef<{ destroy: () => Promise<void> } | null>(null)
+  const onPageCountRef = useRef(onPageCountChange)
+  onPageCountRef.current = onPageCountChange
+
+  useEffect(() => {
+    if (status === 'ready' && typeof pageCount === 'number' && pageCount > 0) {
+      onPageCountRef.current?.(pageCount)
+    }
+  }, [status, pageCount])
 
   useEffect(() => {
     if (status !== 'ready' || !bytes || !pageCount) return
@@ -143,6 +155,7 @@ export function PdfPreview({
         return (
           <canvas
             key={pageNum}
+            className={pageClassName}
             aria-label={`หน้า ${pageNum} จาก ${total}`}
             ref={(el) => {
               canvasRefs.current[idx] = el

@@ -197,6 +197,36 @@ export function CopyIcon(props: IconProps = {}) {
   )
 }
 
+export function MinusIcon(props: IconProps = {}) {
+  return (
+    <Svg {...props}>
+      <path d="M4.5 10h11" />
+    </Svg>
+  )
+}
+
+export function FitWidthIcon(props: IconProps = {}) {
+  return (
+    <Svg {...props}>
+      <path d="M3.5 5v10" />
+      <path d="M16.5 5v10" />
+      <path d="M6.5 10h7" />
+      <path d="M8.5 8L6.5 10l2 2" />
+      <path d="M11.5 8l2 2-2 2" />
+    </Svg>
+  )
+}
+
+export function DownloadIcon(props: IconProps = {}) {
+  return (
+    <Svg {...props}>
+      <path d="M10 3.5v9" />
+      <path d="M6.5 9.5L10 13l3.5-3.5" />
+      <path d="M4 16h12" />
+    </Svg>
+  )
+}
+
 export const text = TextIcon
 export const table = TableIcon
 export const columns = ColumnsIcon
@@ -214,6 +244,9 @@ export const more = MoreIcon
 export const plus = PlusIcon
 export const trash = TrashIcon
 export const copy = CopyIcon
+export const minus = MinusIcon
+export const fitWidth = FitWidthIcon
+export const download = DownloadIcon
 
 export const icons = {
   text: TextIcon,
@@ -233,4 +266,7 @@ export const icons = {
   plus: PlusIcon,
   trash: TrashIcon,
   copy: CopyIcon,
+  minus: MinusIcon,
+  fitWidth: FitWidthIcon,
+  download: DownloadIcon,
 }

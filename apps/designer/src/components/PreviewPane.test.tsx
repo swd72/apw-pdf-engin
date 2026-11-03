@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, act } from '@testing-library/react'
+import { render, act, cleanup } from '@testing-library/react'
 import type { RenderClient } from '@apw-pdf/react'
 import { memo } from '@apw-pdf/templates'
 import { PreviewPane } from './PreviewPane.js'
@@ -20,6 +20,7 @@ describe('PreviewPane', () => {
   })
 
   afterEach(() => {
+    cleanup()
     vi.useRealTimers()
     vi.restoreAllMocks()
   })
