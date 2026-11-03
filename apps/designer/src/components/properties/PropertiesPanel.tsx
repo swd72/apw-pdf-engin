@@ -20,6 +20,8 @@ import { JsonProps } from './types/JsonProps.js'
 export interface PropertiesPanelProps {
   state: EditorState
   onOpenTableEditor(path: BlockPath): void
+  jsonMode?: boolean
+  onJsonModeChange?(next: boolean): void
 }
 
 const KNOWN_BLOCK_TYPES = new Set<string>([
@@ -38,18 +40,27 @@ const KNOWN_BLOCK_TYPES = new Set<string>([
 export function PropertiesPanel({
   state,
   onOpenTableEditor,
+  jsonMode: controlledJsonMode,
+  onJsonModeChange,
 }: PropertiesPanelProps) {
   const { doc, selectedPath } = state
-  const [jsonMode, setJsonMode] = useState(false)
+  const [uncontrolledJsonMode, setUncontrolledJsonMode] = useState(false)
+  const jsonMode = controlledJsonMode ?? uncontrolledJsonMode
   const pathKey = selectedPath ? selectedPath.join('.') : ''
   const prevPathKeyRef = useRef(pathKey)
 
   useEffect(() => {
     if (prevPathKeyRef.current !== pathKey) {
       prevPathKeyRef.current = pathKey
-      setJsonMode(false)
+      setUncontrolledJsonMode(false)
     }
   }, [pathKey])
+
+  const toggleJsonMode = () => {
+    const next = !jsonMode
+    setUncontrolledJsonMode(next)
+    onJsonModeChange?.(next)
+  }
 
   const block = selectedPath ? getBlock(doc, selectedPath) : undefined
 
@@ -137,7 +148,7 @@ export function PropertiesPanel({
             className={`ui-btn ui-btn--ghost ${jsonMode ? 'ui-icon-btn--active' : ''}`}
             style={{ height: '26px', padding: '0 8px', fontSize: '11px' }}
             aria-label="Edit JSON"
-            onClick={() => setJsonMode((v) => !v)}
+            onClick={toggleJsonMode}
           >
             {jsonMode ? 'ฟอร์ม' : 'JSON'}
           </button>

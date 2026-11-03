@@ -46,9 +46,13 @@ export function clampPanels(
   const sideMin = limits?.side ?? DEFAULT_PANEL_LIMITS.side
   const centreMin = limits?.centre ?? DEFAULT_PANEL_LIMITS.centre
   const collapsedWidth = limits?.collapsed ?? DEFAULT_PANEL_LIMITS.collapsed
+  const safeContainerWidth =
+    Number.isFinite(containerWidth) && containerWidth > 0
+      ? containerWidth
+      : 1280
 
-  let left = Math.max(sideMin, Number.isFinite(state.left) ? state.left : 260)
-  let right = Math.max(sideMin, Number.isFinite(state.right) ? state.right : 300)
+  let left = Math.max(sideMin, Number.isFinite(state.left) ? state.left : 280)
+  let right = Math.max(sideMin, Number.isFinite(state.right) ? state.right : 340)
   const leftCollapsed = Boolean(state.leftCollapsed)
   const rightCollapsed = Boolean(state.rightCollapsed)
 
@@ -57,18 +61,24 @@ export function clampPanels(
   }
 
   if (leftCollapsed && !rightCollapsed) {
-    const maxRight = Math.max(sideMin, containerWidth - centreMin - collapsedWidth)
+    const maxRight = Math.max(
+      sideMin,
+      safeContainerWidth - centreMin - collapsedWidth,
+    )
     right = Math.min(right, maxRight)
     return { left, right, leftCollapsed, rightCollapsed }
   }
 
   if (!leftCollapsed && rightCollapsed) {
-    const maxLeft = Math.max(sideMin, containerWidth - centreMin - collapsedWidth)
+    const maxLeft = Math.max(
+      sideMin,
+      safeContainerWidth - centreMin - collapsedWidth,
+    )
     left = Math.min(left, maxLeft)
     return { left, right, leftCollapsed, rightCollapsed }
   }
 
-  const availSides = Math.max(0, containerWidth - centreMin)
+  const availSides = Math.max(0, safeContainerWidth - centreMin)
   let overflow = left + right - availSides
 
   if (overflow > 0) {
@@ -86,8 +96,8 @@ export function clampPanels(
       right -= shrinkRight
       overflow -= shrinkRight
       if (overflow > 0) {
-        const shrinkLeft = Math.min(overflow, Math.max(0, left - sideMin))
-        left -= shrinkLeft
+        const shrinkLeft = Math.min(0, Math.max(0, left - sideMin))
+        left -= Math.min(overflow, Math.max(0, left - sideMin))
       }
     }
   }
@@ -95,15 +105,24 @@ export function clampPanels(
   return { left, right, leftCollapsed, rightCollapsed }
 }
 
-export function defaultPanels(containerWidth: number): PanelState {
-  const collapsed = containerWidth < 1100
+export function defaultPanels(
+  containerWidth: number,
+  fallbackWidth = 1280,
+): PanelState {
+  const safeFallback =
+    Number.isFinite(fallbackWidth) && fallbackWidth > 0 ? fallbackWidth : 1280
+  const effectiveWidth =
+    Number.isFinite(containerWidth) && containerWidth > 0
+      ? containerWidth
+      : safeFallback
+  const collapsed = effectiveWidth < 1100
   const base: PanelState = {
-    left: 260,
-    right: 300,
+    left: 280,
+    right: 340,
     leftCollapsed: collapsed,
     rightCollapsed: collapsed,
   }
-  return clampPanels(base, containerWidth)
+  return clampPanels(base, effectiveWidth)
 }
 
 export function loadPanels(key: string): PanelState | null {

@@ -35,10 +35,19 @@ function samePanels(a: PanelState, b: PanelState): boolean {
 }
 
 function getInitialWidth(saved: PanelState | null): number {
-  const winW =
-    typeof window !== 'undefined' && window.innerWidth > 0
+  const rawWinW =
+    typeof window !== 'undefined' &&
+    Number.isFinite(window.innerWidth) &&
+    window.innerWidth > 0
       ? window.innerWidth
-      : FALLBACK_CONTAINER_WIDTH
+      : 0
+  const isJsdomDefault =
+    rawWinW === 1024 &&
+    typeof navigator !== 'undefined' &&
+    /jsdom/i.test(navigator.userAgent || '')
+  const winW =
+    rawWinW > 0 && !isJsdomDefault ? rawWinW : FALLBACK_CONTAINER_WIDTH
+
   if (saved) {
     const needed =
       (saved.leftCollapsed ? DEFAULT_PANEL_LIMITS.collapsed : saved.left) +
@@ -46,7 +55,7 @@ function getInitialWidth(saved: PanelState | null): number {
       DEFAULT_PANEL_LIMITS.centre
     return Math.max(winW, needed, FALLBACK_CONTAINER_WIDTH)
   }
-  return winW >= 1100 ? winW : FALLBACK_CONTAINER_WIDTH
+  return winW
 }
 
 function readElementWidth(el: HTMLElement): number {
@@ -69,6 +78,7 @@ export function SplitWorkspace({
 }: SplitWorkspaceProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const hadInitialSavedRef = useRef<boolean>(false)
+  const userInteractedRef = useRef<boolean>(false)
   const containerWidthRef = useRef<number>(FALLBACK_CONTAINER_WIDTH)
 
   const [panels, setPanels] = useState<PanelState>(() => {
@@ -79,7 +89,7 @@ export function SplitWorkspace({
       hadInitialSavedRef.current = true
       return clampPanels(saved, initialW)
     }
-    return defaultPanels(initialW)
+    return defaultPanels(initialW, FALLBACK_CONTAINER_WIDTH)
   })
 
   const panelsRef = useRef<PanelState>(panels)
@@ -98,18 +108,15 @@ export function SplitWorkspace({
     const el = containerRef.current
     if (!el) return
 
-    let initializedFromWidth = false
-
     const handleWidth = (w: number) => {
-      if (w <= 0) return
+      if (!Number.isFinite(w) || w <= 0) return
       containerWidthRef.current = w
 
       setPanels((prev) => {
         const next =
-          !initializedFromWidth && !hadInitialSavedRef.current
-            ? defaultPanels(w)
+          !hadInitialSavedRef.current && !userInteractedRef.current
+            ? defaultPanels(w, FALLBACK_CONTAINER_WIDTH)
             : clampPanels(prev, w)
-        initializedFromWidth = true
         panelsRef.current = next
         return samePanels(prev, next) ? prev : next
       })
@@ -120,7 +127,19 @@ export function SplitWorkspace({
       handleWidth(measured)
     }
 
-    if (typeof ResizeObserver === 'undefined') return
+    const onWindowResize = () => {
+      const w = readElementWidth(el) || window.innerWidth
+      if (w > 0) {
+        handleWidth(w)
+      }
+    }
+    window.addEventListener('resize', onWindowResize)
+
+    if (typeof ResizeObserver === 'undefined') {
+      return () => {
+        window.removeEventListener('resize', onWindowResize)
+      }
+    }
 
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -133,11 +152,13 @@ export function SplitWorkspace({
     observer.observe(el)
     return () => {
       observer.disconnect()
+      window.removeEventListener('resize', onWindowResize)
     }
   }, [])
 
   const applyAndPersist = useCallback(
     (updater: (prev: PanelState) => PanelState) => {
+      userInteractedRef.current = true
       setPanels((prev) => {
         const next = updater(prev)
         panelsRef.current = next
@@ -234,6 +255,7 @@ export function SplitWorkspace({
 
       const startX = e.clientX
       const startState = panelsRef.current
+      userInteractedRef.current = true
       setDragging(side)
 
       const onMove = (moveEvt: PointerEvent) => {

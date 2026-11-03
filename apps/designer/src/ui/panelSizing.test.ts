@@ -90,6 +90,28 @@ describe('panelSizing', () => {
     expect(wide.rightCollapsed).toBe(false)
   })
 
+  it('defaultPanels never collapses for width 0 or NaN (falls back to the provided fallback width)', () => {
+    const fromZero = defaultPanels(0, 1440)
+    expect(fromZero.leftCollapsed).toBe(false)
+    expect(fromZero.rightCollapsed).toBe(false)
+    expect(fromZero.left).toBe(280)
+    expect(fromZero.right).toBe(340)
+
+    const fromNaN = defaultPanels(Number.NaN, 1440)
+    expect(fromNaN.leftCollapsed).toBe(false)
+    expect(fromNaN.rightCollapsed).toBe(false)
+    expect(fromNaN.left).toBe(280)
+    expect(fromNaN.right).toBe(340)
+
+    const fromZeroDefaultFallback = defaultPanels(0)
+    expect(fromZeroDefaultFallback.leftCollapsed).toBe(false)
+    expect(fromZeroDefaultFallback.rightCollapsed).toBe(false)
+
+    const fromZeroNarrowFallback = defaultPanels(0, 900)
+    expect(fromZeroNarrowFallback.leftCollapsed).toBe(true)
+    expect(fromZeroNarrowFallback.rightCollapsed).toBe(true)
+  })
+
   it('loadPanels returns null for corrupt data and survives storage errors', () => {
     expect(loadPanels('missing-key')).toBeNull()
 

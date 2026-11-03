@@ -5,6 +5,7 @@ import {
   PdfPreview,
   type RenderClient,
 } from '@apw-pdf/react'
+import { pageSizePt } from './stage/zoom.js'
 
 export interface PreviewPaneProps {
   doc: unknown | null
@@ -54,8 +55,22 @@ export function PreviewPages({
     return <div className="pdf-stage__empty">ยังไม่มีเทมเพลต</div>
   }
 
+  const pageSize = pageSizePt(effectiveDoc)
+  const pageWidthPx = Math.round(pageSize.width * scale)
+  const pageHeightPx = Math.round(pageSize.height * scale)
+
   return (
-    <div className="pdf-stage__sheet-wrap" data-testid="pdf-stage-pages">
+    <div
+      className="pdf-stage__sheet-wrap"
+      data-testid="pdf-stage-pages"
+      data-scale={String(scale)}
+      style={
+        {
+          '--stage-page-width': `${pageWidthPx}px`,
+          '--stage-page-height': `${pageHeightPx}px`,
+        } as React.CSSProperties
+      }
+    >
       <PdfPreview
         doc={effectiveDoc}
         data={effectiveData}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react'
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import type { DocumentDef } from '@apw-pdf/core'
 import { parseDocument } from '@apw-pdf/core'
 import { memo } from '@apw-pdf/templates'
@@ -10,14 +10,18 @@ import {
   deleteTemplate,
   ApiError,
 } from './lib/api.js'
-import { validateDocumentText, validateJsonText, type Issue } from './lib/validate.js'
+import {
+  validateDocumentText,
+  validateJsonText,
+  type Issue,
+} from './lib/validate.js'
 import { docToText, textToDoc, buildSaveRecord } from './lib/editorSync.js'
 import { newTemplateRecord } from './lib/starter.js'
-import { TemplateList } from './components/TemplateList.js'
 import { JsonEditorPane } from './components/JsonEditorPane.js'
 import { VisualEditor } from './components/VisualEditor.js'
-import { PreviewPane } from './components/PreviewPane.js'
-import { UsageSnippet } from './components/UsageSnippet.js'
+import { TopBar } from './components/shell/TopBar.js'
+import { UsePopover } from './components/shell/UsePopover.js'
+import { PagePopover } from './components/shell/PagePopover.js'
 
 export function App() {
   const [templates, setTemplates] = useState<TemplateSummary[]>([])
@@ -27,14 +31,15 @@ export function App() {
 
   const [currentDoc, setCurrentDoc] = useState<DocumentDef>(memo.document)
   const [currentData, setCurrentData] = useState<unknown>(memo.example ?? {})
+  const [dirty, setDirty] = useState(false)
 
   const [docText, setDocText] = useState('')
   const [exampleText, setExampleText] = useState('')
   const [docIssues, setDocIssues] = useState<Issue[]>([])
   const [exampleIssues, setExampleIssues] = useState<Issue[]>([])
 
-  const [validDoc, setValidDoc] = useState<unknown | null>(null)
-  const [validData, setValidData] = useState<unknown | null>(null)
+  const [validDoc, setValidDoc] = useState<unknown | null>(memo.document)
+  const [validData, setValidData] = useState<unknown | null>(memo.example ?? {})
 
   const [isBuiltin, setIsBuiltin] = useState(false)
   const [isNew, setIsNew] = useState(false)
@@ -46,27 +51,34 @@ export function App() {
     message?: string
   }>({ type: 'idle' })
 
-  // Refresh template list
-  const refreshList = useCallback(async (selectTarget?: string) => {
-    try {
-      const list = await listTemplates()
-      setTemplates(list)
-      if (selectTarget) {
-        setSelectedName(selectTarget)
-      } else if (!selectedName && list.length > 0) {
-        const defaultTpl = list.find((t) => t.name === 'memo') ?? list[0]!
-        setSelectedName(defaultTpl.name)
+  const [usePopoverOpen, setUsePopoverOpen] = useState(false)
+  const [pagePopoverOpen, setPagePopoverOpen] = useState(false)
+
+  const refreshList = useCallback(
+    async (selectTarget?: string) => {
+      try {
+        const list = await listTemplates()
+        setTemplates(list)
+        if (selectTarget) {
+          setSelectedName(selectTarget)
+        } else if (!selectedName && list.length > 0) {
+          const defaultTpl = list.find((t) => t.name === 'memo') ?? list[0]!
+          setSelectedName(defaultTpl.name)
+        }
+      } catch (err: any) {
+        setSaveStatus({
+          type: 'error',
+          message: err?.message ?? 'Failed to load list',
+        })
       }
-    } catch (err: any) {
-      setSaveStatus({ type: 'error', message: err?.message ?? 'Failed to load list' })
-    }
-  }, [selectedName])
+    },
+    [selectedName],
+  )
 
   useEffect(() => {
     void refreshList()
   }, [])
 
-  // Load selected template
   useEffect(() => {
     if (!selectedName || isNew) return
 
@@ -88,10 +100,14 @@ export function App() {
         setDataSchema(record.dataSchema)
         setDocIssues([])
         setExampleIssues([])
+        setDirty(false)
         setSaveStatus({ type: 'idle' })
       } catch (err: any) {
         if (!cancelled) {
-          setSaveStatus({ type: 'error', message: err?.message ?? 'Failed to load template' })
+          setSaveStatus({
+            type: 'error',
+            message: err?.message ?? 'Failed to load template',
+          })
         }
       }
     })()
@@ -101,11 +117,11 @@ export function App() {
     }
   }, [selectedName, isNew])
 
-  // Stable handler for VisualEditor changes
   const handleVisualChange = useCallback(
     (next: { doc: DocumentDef; data: unknown }) => {
       setCurrentDoc(next.doc)
       setCurrentData(next.data)
+      setDirty(true)
       try {
         const parsed = parseDocument(next.doc)
         setValidDoc(parsed)
@@ -118,10 +134,17 @@ export function App() {
     [],
   )
 
-  // Debounced validate docText (400ms)
+  const handlePageDocChange = useCallback(
+    (nextDoc: DocumentDef) => {
+      handleVisualChange({ doc: nextDoc, data: currentData })
+    },
+    [handleVisualChange, currentData],
+  )
+
   const docTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const handleDocChange = (text: string) => {
+  const handleDocTextChange = useCallback((text: string) => {
     setDocText(text)
+    setDirty(true)
     if (docTimerRef.current) clearTimeout(docTimerRef.current)
     docTimerRef.current = setTimeout(() => {
       const res = validateDocumentText(text)
@@ -133,12 +156,12 @@ export function App() {
         setValidDoc(null)
       }
     }, 400)
-  }
+  }, [])
 
-  // Debounced validate exampleText (400ms)
   const exampleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const handleExampleChange = (text: string) => {
+  const handleExampleTextChange = useCallback((text: string) => {
     setExampleText(text)
+    setDirty(true)
     if (exampleTimerRef.current) clearTimeout(exampleTimerRef.current)
     exampleTimerRef.current = setTimeout(() => {
       const res = validateJsonText(text)
@@ -150,75 +173,65 @@ export function App() {
         setValidData(null)
       }
     }, 400)
-  }
+  }, [])
 
-  // Switching between Visual and JSON tabs
-  const handleSwitchTopTab = (mode: 'visual' | 'json') => {
-    if (mode === topTab) return
+  const handleSwitchTopTab = useCallback(
+    (mode: 'visual' | 'json') => {
+      if (mode === topTab) return
 
-    if (mode === 'json') {
-      // Visual -> JSON: always succeeds (pretty-print the doc text even if schema-invalid)
-      const text = docToText(currentDoc)
-      const exText = JSON.stringify(currentData, null, 2)
-      setDocText(text)
-      setExampleText(exText)
+      if (mode === 'json') {
+        const text = docToText(currentDoc)
+        const exText = JSON.stringify(currentData, null, 2)
+        setDocText(text)
+        setExampleText(exText)
 
-      const docRes = textToDoc(text)
-      if (!docRes.ok) {
-        setDocIssues(docRes.issues)
+        const docRes = textToDoc(text)
+        setDocIssues(docRes.ok ? [] : docRes.issues)
+
+        const exRes = validateJsonText(exText)
+        setExampleIssues(exRes.ok ? [] : exRes.issues)
+
+        setTopTab('json')
       } else {
-        setDocIssues([])
-      }
+        const docRes = textToDoc(docText)
+        const exRes = validateJsonText(exampleText)
 
-      const exRes = validateJsonText(exText)
-      if (!exRes.ok) {
-        setExampleIssues(exRes.issues)
-      } else {
-        setExampleIssues([])
-      }
-
-      setTopTab('json')
-    } else {
-      // JSON -> Visual: only if textToDoc passes and the example JSON parses;
-      // otherwise stay on JSON and show the issues.
-      const docRes = textToDoc(docText)
-      const exRes = validateJsonText(exampleText)
-
-      let hasError = false
-      if (!docRes.ok) {
-        setDocIssues(docRes.issues)
-        setActiveTab('document')
-        hasError = true
-      } else {
-        setDocIssues([])
-      }
-
-      if (!exRes.ok) {
-        setExampleIssues(exRes.issues)
-        if (!hasError) {
-          setActiveTab('example')
+        let hasError = false
+        if (!docRes.ok) {
+          setDocIssues(docRes.issues)
+          setActiveTab('document')
+          hasError = true
+        } else {
+          setDocIssues([])
         }
-        hasError = true
-      } else {
+
+        if (!exRes.ok) {
+          setExampleIssues(exRes.issues)
+          if (!hasError) {
+            setActiveTab('example')
+          }
+          hasError = true
+        } else {
+          setExampleIssues([])
+        }
+
+        if (hasError) {
+          return
+        }
+
+        setCurrentDoc(docRes.doc)
+        setCurrentData(exRes.value)
+        setValidDoc(docRes.doc)
+        setValidData(exRes.value)
+        setDocIssues([])
         setExampleIssues([])
+        setTopTab('visual')
       }
+    },
+    [topTab, currentDoc, currentData, docText, exampleText],
+  )
 
-      if (hasError) {
-        return
-      }
-
-      setCurrentDoc(docRes.doc)
-      setCurrentData(exRes.value)
-      setValidDoc(docRes.doc)
-      setValidData(exRes.value)
-      setDocIssues([])
-      setExampleIssues([])
-      setTopTab('visual')
-    }
-  }
-
-  // Actions
-  const handleNew = () => {
+  const handleNew = useCallback(() => {
     const raw = window.prompt('Enter new template name (a-z, 0-9, dashes):')
     if (!raw) return
     const name = raw.trim().toLowerCase()
@@ -237,14 +250,19 @@ export function App() {
       setValidData(starter.example)
       setDocIssues([])
       setExampleIssues([])
+      setDirty(true)
       setSaveStatus({ type: 'idle' })
     } catch (err: any) {
       alert(`Invalid template name: ${err?.message ?? 'unknown'}`)
     }
-  }
+  }, [])
 
-  const handleDuplicate = (baseName: string) => {
-    const raw = window.prompt('Enter duplicate template name:', `${baseName}-copy`)
+  const handleDuplicate = useCallback(() => {
+    const baseName = selectedName ?? 'template'
+    const raw = window.prompt(
+      'Enter duplicate template name:',
+      `${baseName}-copy`,
+    )
     if (!raw) return
     const name = raw.trim().toLowerCase()
 
@@ -275,21 +293,31 @@ export function App() {
     setValidData(exampleObj)
     setDocIssues([])
     setExampleIssues([])
+    setDirty(true)
     setSaveStatus({ type: 'idle' })
-  }
+  }, [selectedName, topTab, currentDoc, currentData, docText, exampleText])
 
-  const handleDelete = async (name: string) => {
+  const handleDelete = useCallback(async () => {
+    if (!selectedName || isBuiltin) return
+    if (
+      !window.confirm(
+        `Are you sure you want to delete template "${selectedName}"?`,
+      )
+    ) {
+      return
+    }
     try {
-      await deleteTemplate(name)
+      await deleteTemplate(selectedName)
       setIsNew(false)
       setSelectedName(null)
+      setDirty(false)
       await refreshList()
     } catch (err: any) {
       alert(`Failed to delete: ${err?.message ?? 'unknown error'}`)
     }
-  }
+  }, [selectedName, isBuiltin, refreshList])
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!selectedName) return
 
     let targetName = selectedName
@@ -320,8 +348,11 @@ export function App() {
         docToSave = JSON.parse(docText)
         dataToSave = JSON.parse(exampleText)
         docTextToValidate = docText
-      } catch (err: any) {
-        setSaveStatus({ type: 'error', message: 'Cannot save: JSON syntax error' })
+      } catch {
+        setSaveStatus({
+          type: 'error',
+          message: 'Cannot save: JSON syntax error',
+        })
         return
       }
     }
@@ -349,6 +380,7 @@ export function App() {
       setIsNew(false)
       setIsBuiltin(false)
       setSelectedName(targetName)
+      setDirty(false)
       setSaveStatus({ type: 'success', message: 'Saved successfully!' })
       await refreshList(targetName)
       setTimeout(() => setSaveStatus({ type: 'idle' }), 3000)
@@ -359,298 +391,198 @@ export function App() {
       }
       setSaveStatus({ type: 'error', message: msg })
     }
-  }
+  }, [
+    selectedName,
+    isNew,
+    isBuiltin,
+    topTab,
+    currentDoc,
+    currentData,
+    docText,
+    exampleText,
+    description,
+    refreshList,
+  ])
 
+  const handleSelectFromList = useCallback((name: string) => {
+    setIsNew(false)
+    setSelectedName(name)
+  }, [])
+
+  const handleToggleUsePopover = useCallback(() => {
+    setPagePopoverOpen(false)
+    setUsePopoverOpen((v) => !v)
+  }, [])
+
+  const handleTogglePagePopover = useCallback(() => {
+    setUsePopoverOpen(false)
+    setPagePopoverOpen((v) => !v)
+  }, [])
+
+  const handleCloseUsePopover = useCallback(() => {
+    setUsePopoverOpen(false)
+  }, [])
+
+  const handleClosePagePopover = useCallback(() => {
+    setPagePopoverOpen(false)
+  }, [])
+
+  const menuItems = useMemo(
+    () => [
+      { label: 'สร้างใหม่', onSelect: handleNew },
+      {
+        label: 'ทำซ้ำ',
+        disabled: !selectedName,
+        onSelect: handleDuplicate,
+      },
+      {
+        label: 'ลบ',
+        danger: true,
+        disabled: !selectedName || isBuiltin,
+        onSelect: () => {
+          void handleDelete()
+        },
+      },
+      { label: 'ใช้ในโปรเจกต์', onSelect: handleToggleUsePopover },
+      { label: 'หน้ากระดาษ', onSelect: handleTogglePagePopover },
+    ],
+    [
+      handleNew,
+      handleDuplicate,
+      handleDelete,
+      handleToggleUsePopover,
+      handleTogglePagePopover,
+      selectedName,
+      isBuiltin,
+    ],
+  )
+
+  const totalJsonIssues = docIssues.length + exampleIssues.length
   const currentIssues = activeTab === 'document' ? docIssues : exampleIssues
+  const saveLabel =
+    saveStatus.type === 'saving'
+      ? 'Saving...'
+      : isBuiltin
+        ? 'Save as copy'
+        : 'Save'
 
-  return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '220px minmax(0, 1fr) minmax(320px, 38%)',
-        height: '100vh',
-        width: '100%',
-        overflow: 'hidden',
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      }}
-    >
-      {/* Column 1: Template List */}
-      <div style={{ minWidth: 0, height: '100%', overflow: 'hidden' }}>
-        <TemplateList
-          templates={templates}
-          selectedName={selectedName}
-          onSelect={(name) => {
-            setIsNew(false)
-            setSelectedName(name)
-          }}
-          onNew={handleNew}
-          onDuplicate={handleDuplicate}
-          onDelete={handleDelete}
-        />
-      </div>
-
-      {/* Column 2: Editor Pane */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          minWidth: 0,
-          borderRight: '1px solid #dee2e6',
-          background: '#fff',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Editor Toolbar */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '8px 12px',
-            background: '#f8f9fa',
-            borderBottom: '1px solid #dee2e6',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ display: 'flex', gap: '4px' }}>
-              <button
-                type="button"
-                onClick={() => handleSwitchTopTab('visual')}
-                style={{
-                  padding: '6px 14px',
-                  fontSize: '13px',
-                  fontWeight: topTab === 'visual' ? 600 : 400,
-                  background: topTab === 'visual' ? '#fff' : 'transparent',
-                  border:
-                    topTab === 'visual'
-                      ? '1px solid #dee2e6'
-                      : '1px solid transparent',
-                  borderBottom: topTab === 'visual' ? 'none' : undefined,
-                  borderRadius: '4px 4px 0 0',
-                  cursor: 'pointer',
-                }}
-              >
-                Visual
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSwitchTopTab('json')}
-                style={{
-                  padding: '6px 14px',
-                  fontSize: '13px',
-                  fontWeight: topTab === 'json' ? 600 : 400,
-                  background: topTab === 'json' ? '#fff' : 'transparent',
-                  border:
-                    topTab === 'json'
-                      ? '1px solid #dee2e6'
-                      : '1px solid transparent',
-                  borderBottom: topTab === 'json' ? 'none' : undefined,
-                  borderRadius: '4px 4px 0 0',
-                  cursor: 'pointer',
-                }}
-              >
-                JSON
-                {(docIssues.length > 0 || exampleIssues.length > 0) && (
-                  <span
-                    style={{
-                      marginLeft: '6px',
-                      color: '#dc3545',
-                      fontWeight: 700,
-                    }}
-                  >
-                    ({docIssues.length + exampleIssues.length})
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {topTab === 'json' && (
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '4px',
-                  marginLeft: '8px',
-                  paddingLeft: '8px',
-                  borderLeft: '1px solid #dee2e6',
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('document')}
-                  style={{
-                    padding: '4px 8px',
-                    fontSize: '12px',
-                    fontWeight: activeTab === 'document' ? 600 : 400,
-                    background: activeTab === 'document' ? '#e9ecef' : 'transparent',
-                    border: '1px solid transparent',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  document
-                  {docIssues.length > 0 && (
-                    <span
-                      style={{
-                        marginLeft: '4px',
-                        color: '#dc3545',
-                        fontWeight: 700,
-                      }}
-                    >
-                      ({docIssues.length})
-                    </span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('example')}
-                  style={{
-                    padding: '4px 8px',
-                    fontSize: '12px',
-                    fontWeight: activeTab === 'example' ? 600 : 400,
-                    background: activeTab === 'example' ? '#e9ecef' : 'transparent',
-                    border: '1px solid transparent',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  example data
-                  {exampleIssues.length > 0 && (
-                    <span
-                      style={{
-                        marginLeft: '4px',
-                        color: '#dc3545',
-                        fontWeight: 700,
-                      }}
-                    >
-                      ({exampleIssues.length})
-                    </span>
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {saveStatus.message && (
-              <span
-                style={{
-                  fontSize: '12px',
-                  color:
-                    saveStatus.type === 'error'
-                      ? '#dc3545'
-                      : saveStatus.type === 'success'
-                        ? '#198754'
-                        : '#6c757d',
-                }}
-              >
-                {saveStatus.message}
-              </span>
-            )}
+  const jsonLeftPane =
+    topTab === 'json' ? (
+      <div className="json-pane-wrapper">
+        <div className="panel-header">
+          <div className="ui-segmented" role="tablist">
             <button
               type="button"
-              onClick={handleSave}
-              disabled={saveStatus.type === 'saving'}
-              style={{
-                padding: '6px 14px',
-                fontSize: '13px',
-                fontWeight: 600,
-                background: isBuiltin ? '#6c757d' : '#0d6efd',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
+              role="tab"
+              aria-selected={activeTab === 'document'}
+              className={`ui-segmented__tab ${activeTab === 'document' ? 'ui-segmented__tab--active' : ''}`}
+              onClick={() => setActiveTab('document')}
             >
-              {isBuiltin ? 'Save as copy' : 'Save'}
+              document {docIssues.length > 0 ? `(${docIssues.length})` : ''}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'example'}
+              className={`ui-segmented__tab ${activeTab === 'example' ? 'ui-segmented__tab--active' : ''}`}
+              onClick={() => setActiveTab('example')}
+            >
+              example{' '}
+              {exampleIssues.length > 0 ? `(${exampleIssues.length})` : ''}
             </button>
           </div>
         </div>
-
-        {/* Editor Body */}
-        <div style={{ flex: 1, overflow: 'hidden', padding: topTab === 'visual' ? '0' : '8px' }}>
-          {topTab === 'visual' ? (
-            <VisualEditor
-              doc={currentDoc}
-              data={currentData}
-              onChange={handleVisualChange}
-            />
-          ) : activeTab === 'document' ? (
+        <div className="json-pane-wrapper__body">
+          {activeTab === 'document' ? (
             <JsonEditorPane
               value={docText}
-              onChange={handleDocChange}
+              onChange={handleDocTextChange}
               issues={docIssues}
               readOnly={isBuiltin}
             />
           ) : (
             <JsonEditorPane
               value={exampleText}
-              onChange={handleExampleChange}
+              onChange={handleExampleTextChange}
               issues={exampleIssues}
               readOnly={isBuiltin}
             />
           )}
         </div>
-
-        {/* Issues Tray (in JSON tab) */}
-        {topTab === 'json' && currentIssues.length > 0 && (
-          <div
-            style={{
-              maxHeight: '140px',
-              overflowY: 'auto',
-              padding: '8px 12px',
-              background: '#fff5f5',
-              borderTop: '1px solid #f5c2c7',
-              fontSize: '12px',
-            }}
-          >
-            <div
-              style={{
-                fontWeight: 600,
-                color: '#dc3545',
-                marginBottom: '4px',
-              }}
-            >
-              Validation Issues ({currentIssues.length})
-            </div>
-            {currentIssues.map((issue, idx) => (
-              <div
-                key={idx}
-                style={{
-                  color: '#842029',
-                  marginBottom: '2px',
-                  fontFamily: 'monospace',
-                }}
-              >
-                {issue.line ? `Line ${issue.line}: ` : ''}
-                {issue.path ? `[${issue.path}] ` : ''}
-                {issue.message}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
+    ) : undefined
 
-      {/* Column 3: Live Preview & Usage */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          minWidth: 0,
-          overflow: 'hidden',
-        }}
-      >
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <PreviewPane
-            doc={validDoc}
-            data={validData}
-            templateName={selectedName ?? 'template'}
-          />
+  const jsonRightPane =
+    topTab === 'json' ? (
+      <div className="json-pane-wrapper">
+        <div className="panel-header">
+          <h2 className="panel-header__title">
+            Validation Issues ({currentIssues.length})
+          </h2>
         </div>
-        {selectedName && <UsageSnippet templateName={selectedName} />}
+        <div className="panel-body" style={{ padding: 'var(--sp-3)' }}>
+          {currentIssues.length === 0 ? (
+            <span className="prop-field__label">JSON ถูกต้องพร้อมใช้งาน</span>
+          ) : (
+            <ul className="warnings-strip__list">
+              {currentIssues.map((issue, idx) => (
+                <li key={idx}>
+                  {issue.line ? `Line ${issue.line}: ` : ''}
+                  {issue.path ? `[${issue.path}] ` : ''}
+                  {issue.message}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
+    ) : undefined
+
+  return (
+    <div className="app-shell">
+      <TopBar
+        name={selectedName ?? 'untitled'}
+        dirty={dirty}
+        mode={topTab}
+        onMode={handleSwitchTopTab}
+        onSave={() => {
+          void handleSave()
+        }}
+        saveLabel={saveLabel}
+        saveDisabled={saveStatus.type === 'saving'}
+        statusMessage={saveStatus.message}
+        statusTone={saveStatus.type}
+        jsonIssueCount={topTab === 'json' ? totalJsonIssues : 0}
+        menu={menuItems}
+      />
+
+      <div className="app-shell__popover-layer">
+        <UsePopover
+          templateName={selectedName ?? 'template'}
+          open={usePopoverOpen}
+          onClose={handleCloseUsePopover}
+        />
+        <PagePopover
+          doc={currentDoc}
+          onChange={handlePageDocChange}
+          open={pagePopoverOpen}
+          onClose={handleClosePagePopover}
+        />
+      </div>
+
+      <VisualEditor
+        doc={currentDoc}
+        data={currentData}
+        onChange={handleVisualChange}
+        templates={templates}
+        selectedTemplate={selectedName}
+        onSelectTemplate={handleSelectFromList}
+        onNewTemplate={handleNew}
+        leftOverride={jsonLeftPane}
+        rightOverride={jsonRightPane}
+        stageDoc={validDoc}
+        stageData={validData}
+      />
     </div>
   )
 }

@@ -8,6 +8,8 @@ export type ZoomMode =
 export const ZOOM_PRESETS = [50, 75, 100, 125, 150, 200] as const
 const ZOOM_STEPS = [25, 50, 75, 100, 125, 150, 175, 200] as const
 
+export const STAGE_PADDING = 48
+
 const MIN_SCALE = 0.25
 const MAX_SCALE = 2.0
 
@@ -73,7 +75,7 @@ export function resolveScale(
   mode: ZoomMode,
   container: { width: number; height: number },
   page: { width: number; height: number },
-  padding = 32,
+  padding = STAGE_PADDING,
 ): number {
   if (mode.kind === 'percent') {
     return clampScale(mode.value / 100)
@@ -81,7 +83,7 @@ export function resolveScale(
 
   const pageW = Number.isFinite(page.width) && page.width > 0 ? page.width : PAGE_SIZES.A4.width
   const pageH = Number.isFinite(page.height) && page.height > 0 ? page.height : PAGE_SIZES.A4.height
-  const pad = Number.isFinite(padding) && padding >= 0 ? padding : 32
+  const pad = Number.isFinite(padding) && padding >= 0 ? padding : STAGE_PADDING
 
   const availW = Math.max(0, (Number.isFinite(container.width) ? container.width : 0) - pad)
   const availH = Math.max(0, (Number.isFinite(container.height) ? container.height : 0) - pad)

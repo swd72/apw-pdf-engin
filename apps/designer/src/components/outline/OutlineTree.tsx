@@ -352,6 +352,11 @@ export function OutlineTree({
         role={level > 1 ? 'group' : undefined}
       >
         {renderDropSlot(listPath, 0, level)}
+        {level === 1 && blocks.length === 0 && (
+          <div className="outline-tree__empty">
+            <span>ยังไม่มีบล็อก — กด + เพิ่ม</span>
+          </div>
+        )}
         {blocks.map((block, idx) => {
           const blockPath: BlockPath = [...listPath, idx]
           const childContainers = listChildren(block)

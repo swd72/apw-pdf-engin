@@ -27,9 +27,12 @@ import {
   pageSizePt,
   resolveScale,
   stepZoomPercent,
+  STAGE_PADDING,
   ZOOM_PRESETS,
   type ZoomMode,
 } from './zoom.js'
+
+export { STAGE_PADDING }
 
 export interface PdfStageProps {
   doc: unknown | null
@@ -37,8 +40,6 @@ export interface PdfStageProps {
   templateName?: string
   client?: RenderClient
 }
-
-const STAGE_PADDING = 32
 
 export function PdfStage({
   doc,
@@ -59,14 +60,44 @@ export function PdfStage({
 
   const pageSize = useMemo(() => pageSizePt(effectiveDoc), [effectiveDoc])
 
-  const handlePageCountChange = useCallback((count: number) => {
-    if (!Number.isFinite(count) || count <= 0) return
-    setPageCount((prev) => (prev === count ? prev : count))
-    setCurrentPage((prev) => {
-      const clamped = Math.min(Math.max(1, prev), Math.max(1, count))
-      return prev === clamped ? prev : clamped
-    })
-  }, [])
+  const measureContainer = useCallback(
+    (entry?: ResizeObserverEntry) => {
+      const el = scrollRef.current
+      if (!el) return
+      const w =
+        el.clientWidth > 0 ? el.clientWidth : (entry?.contentRect?.width ?? 0)
+      if (!Number.isFinite(w) || w <= 0) return
+      const rawH =
+        el.clientHeight > 0
+          ? el.clientHeight
+          : (entry?.contentRect?.height ?? 0)
+      const h =
+        Number.isFinite(rawH) && rawH > 0
+          ? rawH
+          : pageSize.height + STAGE_PADDING
+
+      setContainerSize((prev) => {
+        if (prev && prev.width === w && prev.height === h) {
+          return prev
+        }
+        return { width: w, height: h }
+      })
+    },
+    [pageSize.height],
+  )
+
+  const handlePageCountChange = useCallback(
+    (count: number) => {
+      if (!Number.isFinite(count) || count <= 0) return
+      setPageCount((prev) => (prev === count ? prev : count))
+      setCurrentPage((prev) => {
+        const clamped = Math.min(Math.max(1, prev), Math.max(1, count))
+        return prev === clamped ? prev : clamped
+      })
+      measureContainer()
+    },
+    [measureContainer],
+  )
 
   const trackedClient = useMemo<RenderClient | undefined>(() => {
     if (!client) return undefined
@@ -86,36 +117,37 @@ export function PdfStage({
     const el = scrollRef.current
     if (!el) return
 
-    const updateSize = (w: number, h: number) => {
-      if (w <= 0 || h <= 0) return
-      setContainerSize((prev) => {
-        if (prev && prev.width === w && prev.height === h) {
-          return prev
-        }
-        return { width: w, height: h }
-      })
-    }
+    measureContainer()
 
-    if (el.clientWidth > 0 && el.clientHeight > 0) {
-      updateSize(el.clientWidth, el.clientHeight)
+    const onWindowResize = () => {
+      measureContainer()
     }
+    window.addEventListener('resize', onWindowResize)
 
-    if (typeof ResizeObserver === 'undefined') return
+    if (typeof ResizeObserver === 'undefined') {
+      return () => {
+        window.removeEventListener('resize', onWindowResize)
+      }
+    }
 
     const observer = new ResizeObserver((entries) => {
+      if (entries.length === 0) {
+        measureContainer()
+        return
+      }
       for (const entry of entries) {
-        const w = entry.contentRect?.width || el.clientWidth
-        const h = entry.contentRect?.height || el.clientHeight
-        if (w > 0 && h > 0) {
-          updateSize(w, h)
-        }
+        measureContainer(entry)
       }
     })
     observer.observe(el)
+    if (el.firstElementChild) {
+      observer.observe(el.firstElementChild)
+    }
     return () => {
       observer.disconnect()
+      window.removeEventListener('resize', onWindowResize)
     }
-  }, [])
+  }, [measureContainer])
 
   useEffect(() => {
     const el = scrollRef.current
@@ -126,6 +158,7 @@ export function PdfStage({
       if (count > 0) {
         handlePageCountChange(count)
       }
+      measureContainer()
     }
 
     syncCanvasCount()
@@ -134,7 +167,7 @@ export function PdfStage({
     return () => {
       mo.disconnect()
     }
-  }, [handlePageCountChange])
+  }, [handlePageCountChange, measureContainer])
 
   const effectiveContainer = useMemo(
     () =>
@@ -150,8 +183,7 @@ export function PdfStage({
     [mode, effectiveContainer, pageSize],
   )
 
-  const effectivePercent =
-    mode.kind === 'percent' ? mode.value : Math.round(scale * 100)
+  const effectivePercent = Math.round(scale * 100)
 
   const handleZoomIn = useCallback(() => {
     setMode((prev) => {
@@ -225,6 +257,7 @@ export function PdfStage({
         <div
           ref={scrollRef}
           className="pdf-stage__canvas"
+          data-zoom-mode={mode.kind}
           onScroll={handleScroll}
         >
           <PreviewPages

@@ -180,4 +180,100 @@ describe('SplitWorkspace', () => {
     expect(queryByText('พาเนลซ้ายเต็ม')).toBeNull()
     expect(queryByText('พาเนลขวาเต็ม')).toBeNull()
   })
+
+  it('SplitWorkspace first render with no saved state and a 1440px container keeps both sides open', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1440)
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(1440)
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        private cb: ResizeObserverCallback
+        constructor(cb: ResizeObserverCallback) {
+          this.cb = cb
+        }
+        observe(target: Element) {
+          this.cb(
+            [
+              {
+                target,
+                contentRect: { width: 1440, height: 900 } as DOMRectReadOnly,
+              } as ResizeObserverEntry,
+            ],
+            this as unknown as ResizeObserver,
+          )
+        }
+        unobserve() {}
+        disconnect() {}
+      },
+    )
+
+    const { getByTestId, getAllByRole } = render(
+      <SplitWorkspace
+        storageKey="ws-fresh-1440"
+        left={<div>ซ้าย</div>}
+        centre={<div>กลาง</div>}
+        right={<div>ขวา</div>}
+      />,
+    )
+
+    const leftPane = getByTestId('workspace-left')
+    const rightPane = getByTestId('workspace-right')
+    const splitters = getAllByRole('separator')
+
+    expect(leftPane.getAttribute('data-collapsed')).toBe('false')
+    expect(rightPane.getAttribute('data-collapsed')).toBe('false')
+    expect(leftPane.style.width).toBe('280px')
+    expect(rightPane.style.width).toBe('340px')
+    expect(splitters[0]?.getAttribute('aria-expanded')).toBe('true')
+    expect(splitters[1]?.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('SplitWorkspace first render with no saved state and a 900px container collapses both sides', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(900)
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(900)
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        private cb: ResizeObserverCallback
+        constructor(cb: ResizeObserverCallback) {
+          this.cb = cb
+        }
+        observe(target: Element) {
+          this.cb(
+            [
+              {
+                target,
+                contentRect: { width: 900, height: 700 } as DOMRectReadOnly,
+              } as ResizeObserverEntry,
+            ],
+            this as unknown as ResizeObserver,
+          )
+        }
+        unobserve() {}
+        disconnect() {}
+      },
+    )
+
+    const { getByTestId, getAllByRole } = render(
+      <SplitWorkspace
+        storageKey="ws-fresh-900"
+        left={<div>ซ้าย</div>}
+        centre={<div>กลาง</div>}
+        right={<div>ขวา</div>}
+        leftRail={<div>รางซ้าย</div>}
+        rightRail={<div>รางขวา</div>}
+      />,
+    )
+
+    const leftPane = getByTestId('workspace-left')
+    const rightPane = getByTestId('workspace-right')
+    const splitters = getAllByRole('separator')
+
+    expect(leftPane.getAttribute('data-collapsed')).toBe('true')
+    expect(rightPane.getAttribute('data-collapsed')).toBe('true')
+    expect(leftPane.style.width).toBe('44px')
+    expect(rightPane.style.width).toBe('44px')
+    expect(splitters[0]?.getAttribute('aria-expanded')).toBe('false')
+    expect(splitters[1]?.getAttribute('aria-expanded')).toBe('false')
+  })
 })
