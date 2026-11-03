@@ -7,6 +7,7 @@ import {
 import { memo, type MemoInput } from '@apw-pdf/templates'
 
 const initialMemo = memo.example as MemoInput
+const APP_ASSETS = { garuda: '/assets/garuda-placeholder.png' }
 
 export function App() {
   const [agency, setAgency] = useState(initialMemo.agency)
@@ -46,7 +47,7 @@ export function App() {
     <ApwPdfProvider
       fontBaseUrl="/fonts"
       wasmUrl="/harfbuzz-subset.wasm"
-      assets={{ garuda: '/assets/garuda-placeholder.png' }}
+      assets={APP_ASSETS}
       worker
     >
       <div
