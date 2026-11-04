@@ -7,7 +7,7 @@ const baseDoc = {
     size: 'A4' as const,
     margin: { top: '1.5cm', bottom: '2cm', left: '3cm', right: '2cm' },
   },
-  font: { family: 'THSarabunIT9', size: '16pt' },
+  font: { family: 'THSarabunNew', size: '16pt' },
 }
 
 describe('schema', () => {
@@ -178,7 +178,7 @@ describe('schema', () => {
     expect(() =>
       parseDocument({
         ...baseDoc,
-        font: { family: 'THSarabunIT9', size: '1000pt' },
+        font: { family: 'THSarabunNew', size: '1000pt' },
         blocks: [{ type: 'paragraph', text: 'x' }],
       }),
     ).toThrow(expect.objectContaining({ code: 'SCHEMA_INVALID' }))

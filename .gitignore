@@ -5,3 +5,4 @@ coverage/
 .DS_Store
 examples/vite-react/public/
 apps/designer/public/
+apps/designer/saved-templates/

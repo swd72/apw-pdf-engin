@@ -14,7 +14,7 @@ import {
 import type { FontSpec } from '../src/fonts/metrics.js'
 
 const baseFont: FontSpec = {
-  family: 'THSarabunIT9',
+  family: 'THSarabunNew',
   size: 16,
   bold: false,
   italic: false,
@@ -260,7 +260,7 @@ describe('line placement: alignment, tabs, anchors, Thai Distributed', () => {
     const khW = runs[2]!.glyphs.reduce((s, g) => s + g.advance, 0)
     expect(runs[2]!.x + khW).toBeCloseTo(85.04 + 340.1575, 2)
     // Run after 3rd tab ('12.34') aligns '.' at indentLeftX + 15cm
-    const f = await fonts.get('THSarabunIT9', false, false)
+    const f = await fonts.get('THSarabunNew', false, false)
     const preDotW = f.shape('12', 16).width
     expect(runs[3]!.x + preDotW).toBeCloseTo(85.04 + 425.1969, 2)
     // Dotted leader shape emitted for first tab
@@ -310,7 +310,7 @@ describe('line placement: alignment, tabs, anchors, Thai Distributed', () => {
     expect(moEndX).toBeDefined()
 
     // Verify khoX equals run.x + advance of 'บันทึก' (clusters < 6)
-    const fBold = await fonts.get('THSarabunIT9', true, false)
+    const fBold = await fonts.get('THSarabunNew', true, false)
     const prefixW = fBold.shape('บันทึก', 29).width
     expect(khoX!).toBeCloseTo(runs[0]!.x + prefixW, 3)
 

@@ -53,7 +53,7 @@ const baseDocSpec = {
     size: 'A4' as const,
     margin: { top: '1.5cm', bottom: '2cm', left: '3cm', right: '2cm' },
   },
-  font: { family: 'THSarabunIT9', size: '16pt' },
+  font: { family: 'THSarabunNew', size: '16pt' },
 }
 
 describe('block flow and pagination', () => {
@@ -80,9 +80,9 @@ describe('block flow and pagination', () => {
     }))
     const ctx = makeFlowCtx({ ...baseDocSpec, blocks })
     const pages = await paginate(ctx.doc.blocks, ctx)
-    expect(pages.length).toBe(2)
+    expect(pages.length).toBe(3)
 
-    const f = await ctx.fonts.get('THSarabunIT9', false, false)
+    const f = await ctx.fonts.get('THSarabunNew', false, false)
     const { ascent } = lineBox(f.metrics, 16, 'single')
     const firstOnPage2 = pages[1]!.items.find((it) => it.kind === 'glyphs')!
     expect(firstOnPage2.y).toBeCloseTo(42.5197 + ascent, 2)
@@ -98,7 +98,7 @@ describe('block flow and pagination', () => {
     const pagesAuto = await paginate(ctxAuto.doc.blocks, ctxAuto)
     expect(pagesAuto.length).toBe(2)
 
-    const f = await ctxAuto.fonts.get('THSarabunIT9', false, false)
+    const f = await ctxAuto.fonts.get('THSarabunNew', false, false)
     const { ascent } = lineBox(f.metrics, 16, 'single')
     const p2AutoFirst = pagesAuto[1]!.items.find((it) => it.kind === 'glyphs')!
     expect(p2AutoFirst.y).toBeCloseTo(42.5197 + ascent, 2)
@@ -133,7 +133,7 @@ describe('block flow and pagination', () => {
       ],
     }
     // Total body height = 841.8898 - 42.5197 - 56.6929 = 742.6772 pt
-    // 1 line = 18.08 pt
+    // 1 line = 21.296 pt
     // Case 1: room for 1 line (leave ~25pt by adding spacer of 742.6772 - 25 = 717pt)
     const ctxRoom1 = makeFlowCtx({
       ...baseDocSpec,
@@ -144,17 +144,17 @@ describe('block flow and pagination', () => {
     expect(pagesRoom1[0]!.items.filter((it) => it.kind === 'glyphs').length).toBe(0)
     expect(pagesRoom1[1]!.items.filter((it) => it.kind === 'glyphs').length).toBe(5)
 
-    // Case 2: room for 3 lines (3 * 18.08 = 54.24pt; leave 60pt by spacer of 742.6772 - 60 = 682.6pt)
+    // Case 2: room for 2 lines (2 * 21.296 = 42.592pt; leave 60pt by spacer of 742.6772 - 60 = 682.6pt)
     const ctxRoom3 = makeFlowCtx({
       ...baseDocSpec,
       blocks: [{ type: 'spacer', height: '682pt' }, fiveLinePara],
     })
     const pagesRoom3 = await paginate(ctxRoom3.doc.blocks, ctxRoom3)
     expect(pagesRoom3.length).toBe(2)
-    expect(pagesRoom3[0]!.items.filter((it) => it.kind === 'glyphs').length).toBe(3)
-    expect(pagesRoom3[1]!.items.filter((it) => it.kind === 'glyphs').length).toBe(2)
+    expect(pagesRoom3[0]!.items.filter((it) => it.kind === 'glyphs').length).toBe(2)
+    expect(pagesRoom3[1]!.items.filter((it) => it.kind === 'glyphs').length).toBe(3)
 
-    // Case 3: room for 4 lines (4 * 18.08 = 72.32pt; leave 78pt by spacer of 742.6772 - 78 = 664.6pt)
+    // Case 3: room for 3 lines (3 * 21.296 = 63.888pt; leave 78pt by spacer of 742.6772 - 78 = 664.6pt)
     const ctxRoom4 = makeFlowCtx({
       ...baseDocSpec,
       blocks: [{ type: 'spacer', height: '664pt' }, fiveLinePara],
@@ -178,7 +178,7 @@ describe('block flow and pagination', () => {
         { text: 'ย่อหน้าถัดไป 4' },
       ],
     }
-    // Leave room for heading (18.08) + 1 line of next para (18.08) = 40pt (not enough for heading + 2 lines = 54.24pt)
+    // Leave room for heading (21.296) + 0/1 line of next para = 40pt (not enough for heading + 2 lines = 63.888pt)
     const ctxKeepNext = makeFlowCtx({
       ...baseDocSpec,
       blocks: [
@@ -212,7 +212,7 @@ describe('block flow and pagination', () => {
     const ctxChain = makeFlowCtx({
       ...baseDocSpec,
       blocks: [
-        { type: 'spacer', height: '700pt' }, // leaves ~42.68pt: fits A + B (36.16pt) but not A + B + C (54.24pt)
+        { type: 'spacer', height: '700pt' }, // leaves ~42.68pt: fits A + B (42.592pt) but not A + B + C (63.888pt)
         { type: 'paragraph', text: 'หัวข้อใหญ่ A', keepWithNext: true },
         { type: 'paragraph', text: 'หัวข้อย่อย B', keepWithNext: true },
         { type: 'paragraph', text: 'เนื้อหา C' },
@@ -263,7 +263,7 @@ describe('block flow and pagination', () => {
       w: expect.closeTo(42.5197, 2),
     })
     // Paragraph starts at y = 42.52 + ascent (anchored image did not push it down)
-    const f = await ctx.fonts.get('THSarabunIT9', false, false)
+    const f = await ctx.fonts.get('THSarabunNew', false, false)
     const { ascent } = lineBox(f.metrics, 16, 'single')
     const paraGlyph = pages[0]!.items.find((it) => it.kind === 'glyphs')!
     expect(paraGlyph.y).toBeCloseTo(42.5197 + ascent, 2)
@@ -285,8 +285,8 @@ describe('block flow and pagination', () => {
     })
     const pages = await paginate(ctx.doc.blocks, ctx)
     const glyphs = pages[0]!.items.filter((it) => it.kind === 'glyphs')
-    expect(glyphs[1]!.y - glyphs[0]!.y).toBeCloseTo(3 * 18.08, 2)
-    expect(glyphs[2]!.y - glyphs[1]!.y).toBeCloseTo(18.08 + 28.3465, 2)
+    expect(glyphs[1]!.y - glyphs[0]!.y).toBeCloseTo(3 * 21.296, 2)
+    expect(glyphs[2]!.y - glyphs[1]!.y).toBeCloseTo(21.296 + 28.3465, 2)
 
     const lineItem = pages[0]!.items.find((it) => it.kind === 'line')
     expect(lineItem).toBeDefined()

@@ -7,7 +7,7 @@ import { singleLineHeight } from '../src/fonts/metrics.js'
 import type { FontSpec } from '../src/fonts/metrics.js'
 
 const baseFont: FontSpec = {
-  family: 'THSarabunIT9',
+  family: 'THSarabunNew',
   size: 16,
   bold: false,
   italic: false,
@@ -119,7 +119,7 @@ describe('paragraph layout', () => {
   })
 
   it('uses tallest run on a line for line height', async () => {
-    const f20 = await fonts.get('THSarabunIT9', true, false)
+    const f20 = await fonts.get('THSarabunNew', true, false)
     const { layout } = await layoutParagraph(
       {
         type: 'paragraph',
@@ -179,7 +179,7 @@ describe('paragraph layout', () => {
       },
     )
     expect(layout.lines.length).toBe(1)
-    expect(layout.lines[0]!.height).toBeCloseTo(18.08, 4)
+    expect(layout.lines[0]!.height).toBeCloseTo(21.296, 4)
     expect(Number.isNaN(layout.lines[0]!.ascent)).toBe(false)
     expect(Number.isNaN(layout.spaceBefore)).toBe(false)
     expect(Number.isNaN(layout.spaceAfter)).toBe(false)

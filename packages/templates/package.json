@@ -1,6 +1,29 @@
 {
   "name": "@apw-pdf/templates",
   "version": "0.1.0",
+  "description": "Thai government document templates (memo, external letter, leave form) and Garuda assets for @apw-pdf.",
+  "keywords": [
+    "pdf",
+    "thai",
+    "templates",
+    "government",
+    "memo",
+    "saraban"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/swd72/apw-pdf-engin#readme",
+  "bugs": {
+    "url": "https://github.com/swd72/apw-pdf-engin/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swd72/apw-pdf-engin.git",
+    "directory": "packages/templates"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -15,12 +38,15 @@
   },
   "files": [
     "dist",
-    "assets"
+    "assets",
+    "LICENSE",
+    "README.md"
   ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
     "@apw-pdf/core": "workspace:*"

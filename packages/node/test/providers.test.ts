@@ -16,12 +16,12 @@ const PNG_1X1 = Uint8Array.from(
 describe('fsFontProvider and fsImageProvider', () => {
   it('loads font from first matching directory and throws FONT_NOT_FOUND otherwise', async () => {
     const provider = fsFontProvider([path.join(os.tmpdir(), 'nonexistent-fonts'), fontsDir])
-    const bytes = await provider.load('THSarabunIT9', { bold: false, italic: false })
+    const bytes = await provider.load('THSarabunNew', { bold: false, italic: false })
     expect(bytes.byteLength).toBeGreaterThan(1000)
 
     const emptyProvider = fsFontProvider([path.join(os.tmpdir(), 'nonexistent-fonts')])
     await expect(
-      emptyProvider.load('THSarabunIT9', { bold: false, italic: false }),
+      emptyProvider.load('THSarabunNew', { bold: false, italic: false }),
     ).rejects.toMatchObject({ code: 'FONT_NOT_FOUND' })
   })
 

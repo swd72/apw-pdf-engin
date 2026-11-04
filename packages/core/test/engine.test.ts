@@ -9,7 +9,7 @@ const baseDocSpec = {
     size: 'A4' as const,
     margin: { top: '1.5cm', bottom: '2cm', left: '3cm', right: '2cm' },
   },
-  font: { family: 'THSarabunIT9', size: '16pt' },
+  font: { family: 'THSarabunNew', size: '16pt' },
 }
 
 describe('signature, page numbers, and createEngine', () => {
@@ -43,8 +43,8 @@ describe('signature, page numbers, and createEngine', () => {
     // First glyph of "(" at center of content area = 311.811
     expect(nameLine.x).toBeCloseTo(311.811, 2)
 
-    // Name baseline is 4 * 18.08 below previous baseline
-    expect(nameLine.y - bodyLine.y).toBeCloseTo(4 * 18.08, 2)
+    // Name baseline is 4 * 21.296 below previous baseline
+    expect(nameLine.y - bodyLine.y).toBeCloseTo(4 * 21.296, 2)
 
     // Each position line's center equals the name line's center (±0.01)
     const nameW = nameLine.glyphs.reduce((s, g) => s + g.advance, 0)
@@ -60,8 +60,8 @@ describe('signature, page numbers, and createEngine', () => {
 
   it('pulls minLinesBefore (default 3) body lines to next page when signature overflows', async () => {
     const engine = await createEngine({ fonts: testFontProvider() })
-    // 40 1-line paragraphs take 40 * 18.08 = 723.2pt (fits in 742.68pt page 1),
-    // leaving 19.48pt so the signature block (4 * 18.08 + 18.08 = 90.4pt) overflows to page 2
+    // 34 1-line paragraphs take 34 * 21.296 = 724.064pt (fits in 742.68pt page 1),
+    // while paragraphs 35..40 and the signature flow to page 2
     const paras = Array.from({ length: 40 }, (_, i) => ({
       type: 'paragraph' as const,
       text: `บรรทัดเนื้อหาที่ ${i + 1}`,
@@ -82,25 +82,27 @@ describe('signature, page numbers, and createEngine', () => {
       {},
     )
     expect(tree.pages.length).toBe(2)
-    // Page 1 ended earlier (37 lines instead of 40)
+    // Page 1 holds 34 lines
     const p1Glyphs = tree.pages[0]!.items.filter((it) => it.kind === 'glyphs')
-    expect(p1Glyphs.length).toBe(37)
+    expect(p1Glyphs.length).toBe(34)
 
-    // Page 2 has 3 pulled body lines before the signature
+    // Page 2 has the remaining 6 body lines before the signature
     const p2Glyphs = tree.pages[1]!.items.filter(
       (it) => it.kind === 'glyphs' && it.sourcePath.startsWith('blocks['),
     )
-    expect(p2Glyphs[0]!.text).toBe('บรรทัดเนื้อหาที่ 38')
-    expect(p2Glyphs[1]!.text).toBe('บรรทัดเนื้อหาที่ 39')
-    expect(p2Glyphs[2]!.text).toBe('บรรทัดเนื้อหาที่ 40')
-    expect(p2Glyphs[3]!.text).toBe('(นายสมชาย ใจดี)')
+    expect(p2Glyphs[0]!.text).toBe('บรรทัดเนื้อหาที่ 35')
+    expect(p2Glyphs[1]!.text).toBe('บรรทัดเนื้อหาที่ 36')
+    expect(p2Glyphs[2]!.text).toBe('บรรทัดเนื้อหาที่ 37')
+    expect(p2Glyphs[3]!.text).toBe('บรรทัดเนื้อหาที่ 38')
+    expect(p2Glyphs[4]!.text).toBe('บรรทัดเนื้อหาที่ 39')
+    expect(p2Glyphs[5]!.text).toBe('บรรทัดเนื้อหาที่ 40')
+    expect(p2Glyphs[6]!.text).toBe('(นายสมชาย ใจดี)')
   })
 
   it('splits a 5-line paragraph for signature pull-back and pulls all 4 lines of a 4-line paragraph without leaving a 1-line orphan (M3)', async () => {
     const engine = await createEngine({ fonts: testFontProvider() })
 
-    // Subcase A: 35 1-line paragraphs + 1 5-line paragraph = 40 lines on page 1.
-    // Signature (minLinesBefore: 3) splits the 5-line paragraph into 2 lines on page 1 and 3 lines on page 2.
+    // Subcase A: 35 1-line paragraphs + 1 5-line paragraph (34 lines fit on page 1 at 21.296pt/line).
     const paras35 = Array.from({ length: 35 }, (_, i) => ({
       type: 'paragraph' as const,
       text: `บรรทัดที่ ${i + 1}`,
@@ -128,11 +130,14 @@ describe('signature, page numbers, and createEngine', () => {
     )
     expect(tree5.pages.length).toBe(2)
     const p1Glyphs5 = tree5.pages[0]!.items.filter((it) => it.kind === 'glyphs')
-    expect(p1Glyphs5.length).toBe(37) // 35 + 2 lines from the 5-line paragraph
+    expect(p1Glyphs5.length).toBe(34)
     const p2Glyphs5 = tree5.pages[1]!.items.filter(
       (it) => it.kind === 'glyphs' && it.sourcePath.startsWith('blocks['),
     )
     expect(p2Glyphs5.map((g) => g.text)).toEqual([
+      'บรรทัดที่ 35',
+      'วรรคท้ายบรรทัดที่1',
+      'วรรคท้ายบรรทัดที่2',
       'วรรคท้ายบรรทัดที่3',
       'วรรคท้ายบรรทัดที่4',
       'วรรคท้ายบรรทัดที่5',
@@ -140,9 +145,7 @@ describe('signature, page numbers, and createEngine', () => {
       'ผู้อำนวยการ',
     ])
 
-    // Subcase B: 36 1-line paragraphs + 1 4-line paragraph = 40 lines on page 1.
-    // Splitting 3 lines from a 4-line paragraph would leave a 1-line orphan on page 1,
-    // so all 4 lines of the paragraph must be pulled to page 2.
+    // Subcase B: 36 1-line paragraphs + 1 4-line paragraph (34 lines fit on page 1 at 21.296pt/line).
     const paras36 = Array.from({ length: 36 }, (_, i) => ({
       type: 'paragraph' as const,
       text: `บรรทัดที่ ${i + 1}`,
@@ -170,11 +173,13 @@ describe('signature, page numbers, and createEngine', () => {
     )
     expect(tree4.pages.length).toBe(2)
     const p1Glyphs4 = tree4.pages[0]!.items.filter((it) => it.kind === 'glyphs')
-    expect(p1Glyphs4.length).toBe(36) // No 1-line orphan left on page 1
+    expect(p1Glyphs4.length).toBe(34)
     const p2Glyphs4 = tree4.pages[1]!.items.filter(
       (it) => it.kind === 'glyphs' && it.sourcePath.startsWith('blocks['),
     )
     expect(p2Glyphs4.map((g) => g.text)).toEqual([
+      'บรรทัดที่ 35',
+      'บรรทัดที่ 36',
       'สี่บรรทัดที่1',
       'สี่บรรทัดที่2',
       'สี่บรรทัดที่3',
@@ -187,7 +192,7 @@ describe('signature, page numbers, and createEngine', () => {
   it('pulls trailing table rows and does not loop infinitely when minLinesBefore exceeds page height (M3)', async () => {
     const engine = await createEngine({ fonts: testFontProvider() })
 
-    // Subcase A: Preceding table before overflowing signature pulls last 2 body rows to page 2
+    // Subcase A: 34 1-line paragraphs fill page 1 (724.064pt), so the 4-row table and signature flow to page 2
     const paras34 = Array.from({ length: 34 }, (_, i) => ({
       type: 'paragraph' as const,
       text: `บรรทัดที่ ${i + 1}`,
@@ -222,7 +227,14 @@ describe('signature, page numbers, and createEngine', () => {
     const p2TableTexts = treeTable.pages[1]!.items
       .filter((it) => it.kind === 'glyphs' && it.sourcePath.startsWith('blocks['))
       .map((it) => (it.kind === 'glyphs' ? it.text : ''))
-    expect(p2TableTexts).toEqual(['แถวตาราง 3', 'แถวตาราง 4', '(นายสมชาย ใจดี)', 'ผู้อำนวยการ'])
+    expect(p2TableTexts).toEqual([
+      'แถวตาราง 1',
+      'แถวตาราง 2',
+      'แถวตาราง 3',
+      'แถวตาราง 4',
+      '(นายสมชาย ใจดี)',
+      'ผู้อำนวยการ',
+    ])
 
     // Subcase B: minLinesBefore: 45 (exceeds full page height) does not loop into LIMIT_EXCEEDED
     const paras40 = Array.from({ length: 40 }, (_, i) => ({
@@ -253,7 +265,7 @@ describe('signature, page numbers, and createEngine', () => {
     expect(p2HugeTexts).toContain('(นายสมชาย ใจดี)')
   })
 
-  it('renders page numbers from page 2 with Thai numerals and pushes page-2 body down to 52.38pt', async () => {
+  it('renders page numbers from page 2 with Thai numerals and pushes page-2 body down to 55.40pt', async () => {
     const engine = await createEngine({ fonts: testFontProvider() })
     const paras = Array.from({ length: 50 }, (_, i) => ({
       type: 'paragraph' as const,
@@ -285,14 +297,14 @@ describe('signature, page numbers, and createEngine', () => {
       const w = p2PageNum.glyphs.reduce((s, g) => s + g.advance, 0)
       expect(p2PageNum.x + w / 2).toBeCloseTo(311.811, 2)
 
-      const f = await engine.fonts.get('THSarabunIT9', false, false)
+      const f = await engine.fonts.get('THSarabunNew', false, false)
       const box15 = lineBox(f.metrics, 15, 'single')
       expect(p2PageNum.y).toBeCloseTo(35.4331 + box15.ascent, 2)
 
-      // Page-2 body starts at max(42.52, 35.4331 + singleLineHeight(15)) = 52.3831 (±0.01)
+      // Page-2 body starts at max(42.52, 35.4331 + singleLineHeight(15)) = 55.3981 (±0.01)
       const box16 = lineBox(f.metrics, 16, 'single')
       const expectedBodyTop = Math.max(42.5197, 35.4331 + singleLineHeight(f.metrics, 15))
-      expect(expectedBodyTop).toBeCloseTo(52.38, 2)
+      expect(expectedBodyTop).toBeCloseTo(55.4, 2)
 
       const firstBodyGlyph = tree.pages[1]!.items.find(
         (it) => it.kind === 'glyphs' && it.text !== '- ๒ -',

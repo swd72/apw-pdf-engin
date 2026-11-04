@@ -27,9 +27,9 @@ describe('pageSettings', () => {
         left: '3cm',
         right: '2cm',
       },
-      fontFamily: 'THSarabunIT9',
+      fontFamily: 'THSarabunNew',
       fontSize: '16pt',
-      lineSpacing: 'single',
+      lineSpacing: { multiple: 1130 / 1331 },
       numerals: 'thai',
     })
   })

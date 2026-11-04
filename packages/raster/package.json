@@ -1,6 +1,31 @@
 {
   "name": "@apw-pdf/raster",
   "version": "0.1.0",
+  "description": "PDF-to-PNG page rasterizer for @apw-pdf built on pdfjs-dist and @napi-rs/canvas.",
+  "keywords": [
+    "pdf",
+    "thai",
+    "raster",
+    "png",
+    "canvas",
+    "pdfjs"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/swd72/apw-pdf-engin#readme",
+  "bugs": {
+    "url": "https://github.com/swd72/apw-pdf-engin/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swd72/apw-pdf-engin.git",
+    "directory": "packages/raster"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -13,12 +38,15 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.68",

@@ -10,7 +10,7 @@ A TypeScript monorepo that turns declarative JSON templates + data into PDF docu
 | Package | คำอธิบาย (Description) |
 |---|---|
 | `@apw-pdf/core` | Pure TypeScript layout engine: units, schema, data binding/filters, HarfBuzz shaping, Thai segmentation, line breaking, Thai Distributed alignment, pagination, and `LayoutTree` generation (no `fs` or DOM). |
-| `@apw-pdf/fonts` | SIPA Thai national fonts (`THSarabunIT9`, `THSarabunNew`, `THSarabunPSK`, `THNiramitIT9`) + manifest and Node path resolver. |
+| `@apw-pdf/fonts` | SIPA Thai national fonts (`THSarabunNew`, `THSarabunPSK`) + manifest and Node path resolver. |
 | `@apw-pdf/pdf` | Pure TypeScript PDF writer: retain-GID `hb-subset` Wasm font subsetting, `CIDFontType2` / `Identity-H` embedding, `/ToUnicode` CMap generation, and `pdf-lib` rendering. |
 | `@apw-pdf/templates` | Builtin Thai government templates (`memo`, `external-letter`, `leave-sick-personal-maternity`, `leave-vacation`) with typed builders and JSON schemas. |
 | `@apw-pdf/node` | Node.js renderer (`createRenderer`), filesystem/remote providers with path-traversal and SSRF guards, and `apw-pdf` CLI. |
@@ -21,6 +21,8 @@ A TypeScript monorepo that turns declarative JSON templates + data into PDF docu
 ---
 
 ## การติดตั้ง (Installation)
+
+เมื่อแพ็กเกจถูกเผยแพร่ขึ้น npm แล้ว สามารถติดตั้งผ่าน `pnpm add @apw-pdf/...` ได้โดยตรง (Once the packages are published to npm, `pnpm add @apw-pdf/...` works directly):
 
 ```bash
 # Node.js / Backend / CLI
@@ -35,6 +37,29 @@ pnpm build
 pnpm test
 ```
 
+### Before publishing / local install
+
+หากต้องการนำไปติดตั้งในโปรเจกต์อื่นในเครื่องก่อนเผยแพร่ขึ้น npm ให้บิลด์และแพ็กเป็นไฟล์ `.tgz` ดังนี้ (ต้องแพ็กและติดตั้ง tarball ของแพ็กเกจภายในที่เป็น dependency ทุกตัวด้วย เช่น `@apw-pdf/core`, `@apw-pdf/fonts`, `@apw-pdf/pdf`, `@apw-pdf/templates`):
+
+```bash
+# 1. Build all workspace packages
+pnpm -r build
+
+# 2. Pack the target package (and each internal workspace dependency it requires)
+pnpm --filter @apw-pdf/core pack
+pnpm --filter @apw-pdf/fonts pack
+pnpm --filter @apw-pdf/pdf pack
+pnpm --filter @apw-pdf/templates pack
+pnpm --filter @apw-pdf/node pack
+
+# 3. In your consumer project, install the packed tarballs
+pnpm add ./path/to/apw-pdf-core-0.1.0.tgz \
+  ./path/to/apw-pdf-fonts-0.1.0.tgz \
+  ./path/to/apw-pdf-pdf-0.1.0.tgz \
+  ./path/to/apw-pdf-templates-0.1.0.tgz \
+  ./path/to/apw-pdf-node-0.1.0.tgz
+```
+
 ---
 
 ## เริ่มต้นใช้งานตามสภาพแวดล้อม (Quick Start per Environment)
@@ -43,12 +68,10 @@ pnpm test
 
 ```ts
 import { createRenderer } from '@apw-pdf/node'
-import { memo } from '@apw-pdf/templates'
 
 const renderer = await createRenderer()
 
-// Render using template builder
-const { doc, data } = memo.build({
+const data = {
   agency: 'กองเทคโนโลยีดิจิทัล โทร. ๐ ๒๑๒๓ ๔๕๖๗',
   docNo: 'นร ๐๑๐๑/๑๒๓',
   date: '2026-10-31',
@@ -62,9 +85,13 @@ const { doc, data } = memo.build({
     name: 'นายสมชาย ใจดี',
     positions: ['นักวิชาการคอมพิวเตอร์ชำนาญการ'],
   },
-})
+}
 
-await renderer.renderToFile(doc, data, './memo.pdf')
+// Render to a Uint8Array
+const pdfBytes = await renderer.render('memo', data)
+
+// Or write directly to a file
+await renderer.renderToFile('memo', data, './memo.pdf')
 ```
 
 ### 2. CLI (`apw-pdf`)
@@ -103,6 +130,28 @@ export function MemoScreen() {
 ### 4. MCP Server (`@apw-pdf/mcp`) สำหรับ Claude Desktop / Claude Code
 
 เพิ่มการตั้งค่าใน `claude_desktop_config.json` หรือ `.mcp.json`:
+
+- `APW_PDF_OUTPUT_DIR` *(required)*: โฟลเดอร์ที่อนุญาตให้ `render_pdf` เขียนไฟล์ PDF ออกไป
+- `APW_PDF_TEMPLATE_DIR` *(optional)*: โฟลเดอร์สำหรับโหลดและบันทึกเทมเพลต `.json` เพิ่มเติม (เมื่อกำหนดค่านี้จะเปิดใช้งานเครื่องมือ `save_template`)
+
+#### ใช้งานผ่าน `npx` (เมื่อเผยแพร่บน npm แล้ว)
+
+```json
+{
+  "mcpServers": {
+    "apw-pdf": {
+      "command": "npx",
+      "args": ["-y", "@apw-pdf/mcp"],
+      "env": {
+        "APW_PDF_OUTPUT_DIR": "C:/project/apw-pdf-engin/out",
+        "APW_PDF_TEMPLATE_DIR": "C:/project/apw-pdf-engin/saved-templates"
+      }
+    }
+  }
+}
+```
+
+#### ใช้งานจากไฟล์ในเครื่อง (Local clone / build)
 
 ```json
 {
@@ -192,7 +241,7 @@ APW_PDF_TEMPLATE_DIR="C:/project/apw-pdf-engin/saved-templates" npx pnpm@9 --fil
     "size": "A4",
     "margin": { "top": "1.5cm", "bottom": "2cm", "left": "3cm", "right": "2cm" }
   },
-  "font": { "family": "THSarabunIT9", "size": "16pt" },
+  "font": { "family": "THSarabunNew", "size": "16pt" },
   "pageNumber": { "from": 2, "format": "- {n} -", "size": "15pt", "offset": "1.25cm" },
   "blocks": [
     {
@@ -253,7 +302,7 @@ APW_PDF_TEMPLATE_DIR="C:/project/apw-pdf-engin/saved-templates" npx pnpm@9 --fil
 |---|---|
 | กระดาษ | A4 (`210 × 297 mm` = `595.28 × 841.89 pt`) |
 | ขอบกระดาษ | บน `2.5 cm` (หน้าแรกที่มีครุฑเริ่มที่ `1.5 cm`), ล่าง `2 cm`, ซ้าย `3 cm`, ขวา `2 cm` |
-| ฟอนต์มาตรฐาน | `THSarabunIT9` / `THSarabunNew` ขนาด `16 pt` |
+| ฟอนต์มาตรฐาน | `THSarabunNew` / `THSarabunPSK` ขนาด `16 pt` |
 | ครุฑ (บันทึกข้อความ) | สูง `1.5 cm` (`42.52 pt`) ชิดซ้าย (`x = 85.04 pt`, `y = 42.52 pt`) |
 | ครุฑ (หนังสือภายนอก) | สูง `3 cm` (`85.04 pt`) กึ่งกลางหน้า (`x + w/2 = 311.81 pt`, `y = 42.52 pt`) |
 | หัวเรื่อง "บันทึกข้อความ" | `29 pt` หนา กึ่งกลาง ฐานตัวอักษรระดับเดียวกับฐานครุฑ |
@@ -279,3 +328,24 @@ APW_PDF_TEMPLATE_DIR="C:/project/apw-pdf-engin/saved-templates" npx pnpm@9 --fil
 2. พิมพ์ข้อความทดสอบ 5 บรรทัดแล้วส่งออกเป็นไฟล์ PDF จาก Word
 3. อ่านค่าพิกัด `y` ของ baseline แต่ละบรรทัดจากไฟล์ PDF ของ Word เพื่อคำนวณระยะห่างระหว่างบรรทัด ($\Delta y$)
 4. ตรวจสอบและปรับสูตรอ่านค่า `usWinAscent`, `usWinDescent`, `sTypoLineGap` ในไฟล์ [`packages/core/src/fonts/metrics.ts`](packages/core/src/fonts/metrics.ts) (`readFontMetrics` และ `lineBox`) แล้วรันชุดทดสอบ `pnpm -F @apw-pdf/core test`
+
+---
+
+## การเผยแพร่แพ็กเกจขึ้น npm (Publishing — Maintainers)
+
+สำหรับการเผยแพร่แพ็กเกจทั้งหมดใน workspace ขึ้นสู่ npm registry (ดำเนินการจากกิ่ง `master` เท่านั้น):
+
+```bash
+# 1. Authenticate with npm
+npm login
+
+# 2. Verify build, tests, and package contents with a dry run
+pnpm -r build
+pnpm -r test
+pnpm publish -r --dry-run
+
+# 3. Publish all non-private workspace packages from master
+pnpm publish -r
+```
+
+> **หมายเหตุ:** ก่อนเผยแพร่เวอร์ชันถัดไปทุกครั้ง ให้ปรับเลข `"version"` ใน `packages/*/package.json` ให้เรียบร้อยก่อนรัน `pnpm publish -r` (`pnpm` จะแปลง dependency ที่เป็น `"workspace:*"` ให้เป็นเลขเวอร์ชันจริงใน tarball โดยอัตโนมัติขณะ publish)

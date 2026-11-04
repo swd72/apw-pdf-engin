@@ -12,12 +12,16 @@ const defaultIO: CliIO = {
   stderr: (msg: string) => console.error(msg),
 }
 
+function stripBom(text: string): string {
+  return text.startsWith('\uFEFF') ? text.slice(1) : text
+}
+
 async function loadTemplateOrFile(spec: string): Promise<unknown> {
   if (Object.hasOwn(templates, spec)) {
     // Pass the name through so the renderer applies template build() options.
     return spec
   }
-  const raw = await fs.readFile(spec, 'utf8')
+  const raw = stripBom(await fs.readFile(spec, 'utf8'))
   const parsed = JSON.parse(raw) as Record<string, unknown>
   return 'document' in parsed && typeof parsed.document === 'object'
     ? parsed.document
@@ -46,7 +50,9 @@ export async function runCli(
     }
     try {
       const doc = await loadTemplateOrFile(tplSpec)
-      const data = JSON.parse(await fs.readFile(dataPath, 'utf8')) as unknown
+      const data = JSON.parse(
+        stripBom(await fs.readFile(dataPath, 'utf8')),
+      ) as unknown
       const renderer = await createRenderer()
       const res = renderer.validate(doc, data)
       if (!res.ok) {
@@ -89,7 +95,9 @@ export async function runCli(
 
     try {
       const doc = await loadTemplateOrFile(tplSpec)
-      const data = JSON.parse(await fs.readFile(dataPath, 'utf8')) as unknown
+      const data = JSON.parse(
+        stripBom(await fs.readFile(dataPath, 'utf8')),
+      ) as unknown
       const renderer = await createRenderer()
       const res = await renderer.renderToFile(doc, data, outFile, { strict })
       for (const w of res.warnings) {

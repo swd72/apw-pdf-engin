@@ -1,6 +1,32 @@
 {
   "name": "@apw-pdf/node",
   "version": "0.1.0",
+  "description": "Node.js PDF renderer and CLI for @apw-pdf with filesystem font and image providers.",
+  "keywords": [
+    "pdf",
+    "thai",
+    "nodejs",
+    "cli",
+    "renderer",
+    "document"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/swd72/apw-pdf-engin#readme",
+  "bugs": {
+    "url": "https://github.com/swd72/apw-pdf-engin/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swd72/apw-pdf-engin.git",
+    "directory": "packages/node"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -17,12 +43,15 @@
   },
   "files": [
     "dist",
-    "bin"
+    "bin",
+    "LICENSE",
+    "README.md"
   ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
     "@apw-pdf/core": "workspace:*",

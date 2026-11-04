@@ -64,7 +64,7 @@ const BASE_DOC = {
     size: 'A4' as const,
     margin: { top: '1.5cm', bottom: '2cm', left: '3cm', right: '2cm' },
   },
-  font: { family: 'THSarabunIT9', size: '16pt' },
+  font: { family: 'THSarabunNew', size: '16pt' },
 }
 
 describe('writePdf and createPdfEngine', () => {
@@ -320,8 +320,8 @@ describe('writePdf and createPdfEngine', () => {
       .replace(/\s+/g, '')
     expect(extracted).toBe(sourceText.replace(/\s+/g, ''))
 
-    // Verify lookupCmapGlyphId finds U+0E33 in THSarabunIT9 and returns null on empty/missing cmap
-    const font = await engine.fonts.get('THSarabunIT9', false, false)
+    // Verify lookupCmapGlyphId finds U+0E33 in THSarabunNew and returns null on empty/missing cmap
+    const font = await engine.fonts.get('THSarabunNew', false, false)
     expect(lookupCmapGlyphId(font.bytes, 0x0e33)).toBe(264)
     expect(lookupCmapGlyphId(font.bytes, 0x1f600)).toBeNull()
     expect(lookupCmapGlyphId(new Uint8Array(4), 0x0e33)).toBeNull()

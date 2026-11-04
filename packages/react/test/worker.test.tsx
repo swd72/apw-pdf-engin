@@ -15,7 +15,7 @@ describe('fetchFontProvider and worker handleMessage', () => {
     vi.restoreAllMocks()
   })
 
-  it('fetchFontProvider requests /fonts/THSarabunIT9-Bold.ttf for bold and caches the promise', async () => {
+  it('fetchFontProvider requests /fonts/THSarabunNew-Bold.ttf for bold and caches the promise', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue({
@@ -24,10 +24,10 @@ describe('fetchFontProvider and worker handleMessage', () => {
       } as Response)
 
     const provider = fetchFontProvider('/fonts')
-    const b1 = await provider.load('THSarabunIT9', { bold: true, italic: false })
-    const b2 = await provider.load('THSarabunIT9', { bold: true, italic: false })
+    const b1 = await provider.load('THSarabunNew', { bold: true, italic: false })
+    const b2 = await provider.load('THSarabunNew', { bold: true, italic: false })
     expect(fetchSpy).toHaveBeenCalledTimes(1)
-    expect(fetchSpy).toHaveBeenCalledWith('/fonts/THSarabunIT9-Bold.ttf')
+    expect(fetchSpy).toHaveBeenCalledWith('/fonts/THSarabunNew-Bold.ttf')
     expect(b1.byteLength).toBe(4)
     expect(b2.byteLength).toBe(4)
   })

@@ -6,7 +6,7 @@ import { breakLines } from '../src/layout/linebreak.js'
 import type { FontSpec } from '../src/fonts/metrics.js'
 
 const baseFont: FontSpec = {
-  family: 'THSarabunIT9',
+  family: 'THSarabunNew',
   size: 16,
   bold: false,
   italic: false,
@@ -44,7 +44,7 @@ describe('inline items and greedy line breaking', () => {
   })
 
   it('trailing spaces hang and do not cause early break', async () => {
-    const font = await fonts.get('THSarabunIT9', false, false)
+    const font = await fonts.get('THSarabunNew', false, false)
     const wordW = font.shape('กขคง', 16).width
     const { items } = await buildInlineItems(
       { type: 'paragraph', text: 'กขคง   กขคง' },

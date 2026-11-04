@@ -58,6 +58,29 @@ describe('apw-pdf CLI', () => {
     expect(await runCli(['render', 'memo', goodJson], io)).toBe(1)
   })
 
+  it('renders a UTF-8 BOM-prefixed data file and template file', async () => {
+    const logs: string[] = []
+    const errs: string[] = []
+    const io = {
+      stdout: (msg: string) => logs.push(msg),
+      stderr: (msg: string) => errs.push(msg),
+    }
+
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'apw-pdf-cli-bom-'))
+    const bomDataJson = path.join(tmpDir, 'bom-data.json')
+    const bomTplJson = path.join(tmpDir, 'bom-tpl.json')
+    const outPdf = path.join(tmpDir, 'bom-out.pdf')
+
+    await fs.writeFile(bomDataJson, `\uFEFF${JSON.stringify(memo.example)}`, 'utf8')
+    await fs.writeFile(bomTplJson, `\uFEFF${JSON.stringify(memo.document)}`, 'utf8')
+
+    expect(await runCli(['validate', bomTplJson, bomDataJson], io)).toBe(0)
+    expect(await runCli(['render', 'memo', bomDataJson, '-o', outPdf], io)).toBe(0)
+    expect(errs).toEqual([])
+    const stat = await fs.stat(outPdf)
+    expect(stat.size).toBeGreaterThan(1000)
+  })
+
   it('exits with code 1 and prints MISSING_VARIABLE when running node bin/apw-pdf.js validate memo bad.json', async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'apw-pdf-bin-'))
     const badJson = path.join(tmpDir, 'bad.json')

@@ -30,7 +30,7 @@ function createDoc(
       size: 'A4',
       margin: { top: '1.5cm', bottom: '2cm', left: '3cm', right: '2cm' },
     },
-    font: { family: 'THSarabunIT9', size: '16pt' },
+    font: { family: 'THSarabunNew', size: '16pt' },
     ...(withGarudaAsset ? { assets: { garuda: 'asset:garuda' } } : {}),
     blocks,
   }
