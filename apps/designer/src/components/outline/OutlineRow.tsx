@@ -2,8 +2,10 @@ import React, { useMemo } from 'react'
 import type { Block } from '@apw-pdf/core'
 import type { EditorState } from '../../editor/useEditorState.js'
 import {
+  getBlock,
   listChildren,
   canMoveInto,
+  loopMoveGuardTitle,
   type BlockPath,
 } from '../../editor/docModel.js'
 import { Menu, type MenuItem } from '../../ui/Menu.js'
@@ -109,10 +111,25 @@ export function OutlineRow({
 
   const isFirst = index <= 0
   const isLast = index >= parentList.length - 1
-  const canMoveOut = parentListPath.length > 1
+
+  let outerListPath: BlockPath | null = null
+  if (parentListPath.length > 1) {
+    for (let k = path.length - 1; k >= 1; k--) {
+      const sub = path.slice(0, k)
+      if (getBlock(doc, sub)) {
+        outerListPath = sub.slice(0, -1)
+        break
+      }
+    }
+  }
+  const moveOutGuardTitle = outerListPath
+    ? loopMoveGuardTitle(doc, path, outerListPath)
+    : undefined
+  const canMoveOut = parentListPath.length > 1 && !moveOutGuardTitle
 
   let canMoveIntoPrev = false
   let targetListPath: BlockPath | null = null
+  let moveIntoPrevGuardTitle: string | undefined
   if (!isFirst) {
     const prevBlock = parentList[index - 1]
     if (prevBlock) {
@@ -123,7 +140,14 @@ export function OutlineRow({
           index - 1,
           ...prevChildren[prevChildren.length - 1]!.key,
         ]
-        canMoveIntoPrev = canMoveInto(doc, path, targetListPath)
+        if (canMoveInto(doc, path, targetListPath)) {
+          moveIntoPrevGuardTitle = loopMoveGuardTitle(
+            doc,
+            path,
+            targetListPath,
+          )
+          canMoveIntoPrev = !moveIntoPrevGuardTitle
+        }
       }
     }
   }
@@ -131,7 +155,7 @@ export function OutlineRow({
   const menuItems = useMemo<MenuItem[]>(
     () => [
       {
-        label: 'Move up',
+        label: 'เลื่อนขึ้น',
         disabled: isFirst,
         onSelect: () => {
           select(path)
@@ -139,7 +163,7 @@ export function OutlineRow({
         },
       },
       {
-        label: 'Move down',
+        label: 'เลื่อนลง',
         disabled: isLast,
         onSelect: () => {
           select(path)
@@ -147,8 +171,9 @@ export function OutlineRow({
         },
       },
       {
-        label: 'Move into previous',
+        label: 'ย้ายเข้าบล็อกก่อนหน้า',
         disabled: !canMoveIntoPrev,
+        title: moveIntoPrevGuardTitle,
         onSelect: () => {
           select(path)
           if (targetListPath) {
@@ -157,29 +182,30 @@ export function OutlineRow({
         },
       },
       {
-        label: 'Move out',
+        label: 'ย้ายออกนอกกลุ่ม',
         disabled: !canMoveOut,
+        title: moveOutGuardTitle,
         onSelect: () => {
           select(path)
           moveSelectedOut()
         },
       },
       {
-        label: 'Duplicate',
+        label: 'ทำสำเนา',
         onSelect: () => {
           select(path)
           duplicateSelected()
         },
       },
       {
-        label: 'Edit JSON',
+        label: 'แก้ JSON',
         onSelect: () => {
           select(path)
           onEditJson?.(path)
         },
       },
       {
-        label: 'Delete',
+        label: 'ลบ',
         danger: true,
         onSelect: () => {
           select(path)
@@ -192,6 +218,8 @@ export function OutlineRow({
       isLast,
       canMoveIntoPrev,
       canMoveOut,
+      moveIntoPrevGuardTitle,
+      moveOutGuardTitle,
       path,
       targetListPath,
       select,

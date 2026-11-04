@@ -6,6 +6,7 @@ export interface MenuItem {
   onSelect(): void
   disabled?: boolean
   danger?: boolean
+  title?: string
 }
 
 export interface MenuProps {
@@ -71,6 +72,7 @@ export function Menu({ label, items, icon }: MenuProps) {
               type="button"
               role="menuitem"
               aria-label={item.label}
+              title={item.title}
               disabled={item.disabled}
               className={`ui-menu__item ${item.danger ? 'ui-menu__item--danger' : ''}`}
               onClick={() => {

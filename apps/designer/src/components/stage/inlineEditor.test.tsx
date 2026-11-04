@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, fireEvent, cleanup } from '@testing-library/react'
+import { render, fireEvent, act, cleanup } from '@testing-library/react'
 import type { Block, DocumentDef, PageInfo, TableBlock } from '@apw-pdf/core'
 import { useEditorState, type EditorState } from '../../editor/useEditorState.js'
 import type { BlockPath } from '../../editor/docModel.js'
@@ -31,6 +31,10 @@ function createDoc(
 const SAMPLE_DATA: Record<string, unknown> = {
   subject: 'เรื่องทดสอบ',
   author: { name: 'สมชาย' },
+}
+const LOOP_DATA: Record<string, unknown> = {
+  body: ['ย่อหน้าแรก', 'ย่อหน้าที่สอง', 'ย่อหน้าที่สาม'],
+  items: [{ qty: 5 }],
 }
 const NOOP = () => {}
 
@@ -460,5 +464,221 @@ describe('editTarget and InlineTextEditor on StageOverlay', () => {
     expect((latestEditor!.doc.blocks[0] as any).text).toBe(
       'เรียน {{author.name}}คุณ',
     )
+  })
+
+  it('loop instance shows data header, edits body[1] via setData leaving template {{p}} untouched, and one undo() restores old data value', () => {
+    const doc = createDoc([
+      {
+        type: 'each',
+        of: 'body',
+        as: 'p',
+        blocks: [{ type: 'paragraph', text: '{{p}}' }],
+      },
+    ])
+    const page: PageInfo = {
+      width: 595,
+      height: 842,
+      content: { x: 85, y: 56, w: 453, h: 730 },
+      boxes: [
+        { path: 'blocks[0].blocks[0]', inst: [0], x: 85, y: 60, w: 453, h: 24 },
+        { path: 'blocks[0].blocks[0]', inst: [1], x: 85, y: 90, w: 453, h: 24 },
+      ],
+    }
+    let latestEditor: EditorState | null = null
+
+    const { container, getByLabelText, getByText, queryByLabelText } = render(
+      <InlineHarness
+        initialDoc={doc}
+        data={LOOP_DATA}
+        page={page}
+        onState={(s) => {
+          latestEditor = s
+        }}
+      />,
+    )
+
+    const boxes = container.querySelectorAll<HTMLElement>(
+      '[data-block-path="blocks.0.blocks.0"]',
+    )
+    expect(boxes.length).toBe(2)
+
+    // Double-click the second instance (inst: [1])
+    fireEvent.doubleClick(boxes[1]!)
+
+    expect(getByText('ข้อความจากข้อมูล body[1]')).not.toBeNull()
+    const textarea = getByLabelText('แก้ไขข้อความ') as HTMLTextAreaElement
+    expect(textarea.value).toBe('ย่อหน้าที่สอง')
+
+    fireEvent.change(textarea, { target: { value: 'ย่อหน้าที่สอง (แก้ไขแล้ว)' } })
+    fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true })
+
+    expect(queryByLabelText('แก้ไขข้อความ')).toBeNull()
+    const updatedData = latestEditor!.data as { body: string[] }
+    expect(updatedData.body).toEqual([
+      'ย่อหน้าแรก',
+      'ย่อหน้าที่สอง (แก้ไขแล้ว)',
+      'ย่อหน้าที่สาม',
+    ])
+    const eachBlock = latestEditor!.doc.blocks[0] as Extract<
+      Block,
+      { type: 'each' }
+    >
+    expect((eachBlock.blocks[0] as any).text).toBe('{{p}}')
+
+    // One undo() restores the old data value
+    act(() => {
+      latestEditor!.undo()
+    })
+    expect((latestEditor!.data as { body: string[] }).body[1]).toBe(
+      'ย่อหน้าที่สอง',
+    )
+  })
+
+  it('toggle แก้แม่แบบ switches to template text and updates block template', () => {
+    const doc = createDoc([
+      {
+        type: 'each',
+        of: 'body',
+        as: 'p',
+        blocks: [{ type: 'paragraph', text: '{{p}}' }],
+      },
+    ])
+    const page: PageInfo = {
+      width: 595,
+      height: 842,
+      content: { x: 85, y: 56, w: 453, h: 730 },
+      boxes: [
+        { path: 'blocks[0].blocks[0]', inst: [1], x: 85, y: 90, w: 453, h: 24 },
+      ],
+    }
+    let latestEditor: EditorState | null = null
+
+    const { container, getByLabelText, getByText } = render(
+      <InlineHarness
+        initialDoc={doc}
+        data={LOOP_DATA}
+        page={page}
+        onState={(s) => {
+          latestEditor = s
+        }}
+      />,
+    )
+
+    const box = container.querySelector<HTMLElement>('.stage-box')!
+    fireEvent.doubleClick(box)
+
+    const textarea = getByLabelText('แก้ไขข้อความ') as HTMLTextAreaElement
+    expect(textarea.value).toBe('ย่อหน้าที่สอง')
+
+    const toggleBtn = getByText('แก้แม่แบบ')
+    fireEvent.click(toggleBtn)
+
+    expect(getByText('แม่แบบ (มีผลทุกรายการใน body)')).not.toBeNull()
+    expect(textarea.value).toBe('{{p}}')
+
+    fireEvent.change(textarea, { target: { value: 'ข้อ {{p}}' } })
+    fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true })
+
+    const eachBlock = latestEditor!.doc.blocks[0] as Extract<
+      Block,
+      { type: 'each' }
+    >
+    expect((eachBlock.blocks[0] as any).text).toBe('ข้อ {{p}}')
+    expect((latestEditor!.data as { body: string[] }).body[1]).toBe(
+      'ย่อหน้าที่สอง',
+    )
+  })
+
+  it('shows repeatOf header when loop paragraph is not directly resolvable to a dataPath', () => {
+    const doc = createDoc([
+      {
+        type: 'each',
+        of: 'body',
+        as: 'p',
+        blocks: [{ type: 'paragraph', text: 'ข้อ {{p}}' }],
+      },
+    ])
+    const page: PageInfo = {
+      width: 595,
+      height: 842,
+      content: { x: 85, y: 56, w: 453, h: 730 },
+      boxes: [
+        { path: 'blocks[0].blocks[0]', inst: [1], x: 85, y: 90, w: 453, h: 24 },
+      ],
+    }
+    let latestEditor: EditorState | null = null
+
+    const { container, getByLabelText, getByText, queryByText } = render(
+      <InlineHarness
+        initialDoc={doc}
+        data={LOOP_DATA}
+        page={page}
+        onState={(s) => {
+          latestEditor = s
+        }}
+      />,
+    )
+
+    const box = container.querySelector<HTMLElement>('.stage-box')!
+    fireEvent.doubleClick(box)
+
+    expect(getByText('ซ้ำตาม body · รายการที่ 2')).not.toBeNull()
+    expect(queryByText('แก้แม่แบบ')).toBeNull()
+
+    const textarea = getByLabelText('แก้ไขข้อความ') as HTMLTextAreaElement
+    expect(textarea.value).toBe('ข้อ {{p}}')
+
+    fireEvent.change(textarea, { target: { value: '- {{p}}' } })
+    fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true })
+
+    const eachBlock = latestEditor!.doc.blocks[0] as Extract<
+      Block,
+      { type: 'each' }
+    >
+    expect((eachBlock.blocks[0] as any).text).toBe('- {{p}}')
+  })
+
+  it('keeps number data value as a number when edited text parses as a number', () => {
+    const doc = createDoc([
+      {
+        type: 'each',
+        of: 'items',
+        as: 'item',
+        blocks: [{ type: 'paragraph', text: '{{item.qty}}' }],
+      },
+    ])
+    const page: PageInfo = {
+      width: 595,
+      height: 842,
+      content: { x: 85, y: 56, w: 453, h: 730 },
+      boxes: [
+        { path: 'blocks[0].blocks[0]', inst: [0], x: 85, y: 60, w: 453, h: 24 },
+      ],
+    }
+    let latestEditor: EditorState | null = null
+
+    const { container, getByLabelText } = render(
+      <InlineHarness
+        initialDoc={doc}
+        data={LOOP_DATA}
+        page={page}
+        onState={(s) => {
+          latestEditor = s
+        }}
+      />,
+    )
+
+    const box = container.querySelector<HTMLElement>('.stage-box')!
+    fireEvent.doubleClick(box)
+
+    const textarea = getByLabelText('แก้ไขข้อความ') as HTMLTextAreaElement
+    expect(textarea.value).toBe('5')
+
+    fireEvent.change(textarea, { target: { value: '12' } })
+    fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true })
+
+    expect(
+      (latestEditor!.data as { items: Array<{ qty: unknown }> }).items[0]!.qty,
+    ).toBe(12)
   })
 })

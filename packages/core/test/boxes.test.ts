@@ -79,9 +79,47 @@ describe('block boxes and blockKeyOf', () => {
       { xs: ['1', '2', '3'] },
     )
     const boxes = tree.pages[0]!.boxes
+    const nonLoopBox = boxes.find((b) => b.path === 'blocks[0]')
+    expect(nonLoopBox?.inst).toBeUndefined()
     const loopBoxes = boxes.filter((b) => b.path === 'blocks[1].blocks[0]')
     expect(loopBoxes.length).toBe(3)
+    expect(loopBoxes.map((b) => b.inst)).toEqual([[0], [1], [2]])
     expect(boxes.some((b) => b.path === 'blocks[2]' || b.path === 'blocks[3]')).toBe(false)
+  })
+
+  it('nested each inside each produces multi-element inst [i, j]', async () => {
+    const engine = await createEngine({ fonts: testFontProvider() })
+    const tree = await engine.layout(
+      {
+        ...baseDocSpec,
+        blocks: [
+          {
+            type: 'each',
+            of: 'groups',
+            as: 'g',
+            blocks: [
+              {
+                type: 'each',
+                of: 'g.rows',
+                as: 'r',
+                blocks: [{ type: 'paragraph', text: '{{r}}' }],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        groups: [{ rows: ['a', 'b'] }, { rows: ['c'] }],
+      },
+    )
+    const boxes = tree.pages[0]!.boxes.filter(
+      (b) => b.path === 'blocks[0].blocks[0].blocks[0]',
+    )
+    expect(boxes.map((b) => b.inst)).toEqual([
+      [0, 0],
+      [0, 1],
+      [1, 0],
+    ])
   })
 
   it('if branches use then/else paths', async () => {
@@ -173,6 +211,7 @@ describe('block boxes and blockKeyOf', () => {
       (b) => b.path === 'blocks[0].columns[0].blocks[0].blocks[0]',
     )
     expect(itemBoxes.length).toBe(3)
+    expect(itemBoxes.map((b) => b.inst)).toEqual([[0], [1], [2]])
     expect(itemBoxes[0]!.y).toBeLessThan(itemBoxes[1]!.y)
     expect(itemBoxes[1]!.y).toBeLessThan(itemBoxes[2]!.y)
   })

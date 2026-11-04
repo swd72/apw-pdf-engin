@@ -57,4 +57,33 @@ describe('PreviewPane', () => {
     // The previous canvas remains visible
     expect(queryByLabelText('หน้า 1 จาก 1')).not.toBeNull()
   })
+
+  it('PreviewPages passes strict={false} to PdfPreview while PdfDownloadButton keeps default strictness', async () => {
+    const renderSpy = vi.fn(async () => ({
+      id: 1,
+      ok: true as const,
+      bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46]),
+      pageCount: 1,
+      warnings: [],
+    }))
+    const client: RenderClient = {
+      render: renderSpy,
+      dispose: vi.fn(),
+    }
+
+    render(<PreviewPane doc={memo.document} data={{}} client={client} />)
+
+    await act(async () => {
+      vi.advanceTimersByTime(300)
+    })
+
+    // PreviewPages renders with debounceMs=0 and strict=false
+    expect(renderSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ strict: false }),
+    )
+    // PdfDownloadButton renders with default strict (undefined)
+    expect(renderSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ strict: undefined }),
+    )
+  })
 })

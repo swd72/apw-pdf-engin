@@ -12,6 +12,7 @@ import {
   moveOut,
   duplicateBlock,
   canMoveInto,
+  loopVarsBrokenByMove,
 } from './docModel.js'
 
 function createBaseDoc(blocks: DocumentDef['blocks'] = []): DocumentDef {
@@ -268,5 +269,112 @@ describe('docModel', () => {
     expect(moveBlockTo(doc, ['blocks', 0], ['invalid'], 0)).toBe(doc)
     expect(moveBlockTo(doc, ['blocks', 0], ['blocks'], 99)).toBe(doc)
     expect(moveBlockTo(doc, ['blocks', 0], ['blocks'], -1)).toBe(doc)
+  })
+
+  it('loopVarsBrokenByMove returns ["p"] when moving {{p}} from blocks[6].blocks[0] to ["blocks"]', () => {
+    expect(
+      loopVarsBrokenByMove(memo.document, ['blocks', 6, 'blocks', 0], ['blocks']),
+    ).toEqual(['p'])
+  })
+
+  it('loopVarsBrokenByMove returns [] when moving {{p}} to another position inside the same loop', () => {
+    expect(
+      loopVarsBrokenByMove(
+        memo.document,
+        ['blocks', 6, 'blocks', 0],
+        ['blocks', 6, 'blocks'],
+      ),
+    ).toEqual([])
+  })
+
+  it('loopVarsBrokenByMove returns [] for a block referencing root data {{to}}', () => {
+    const doc = createBaseDoc([
+      {
+        type: 'each',
+        of: 'body',
+        as: 'p',
+        blocks: [{ type: 'paragraph', text: 'เรียน {{to}}' }],
+      },
+    ])
+    expect(
+      loopVarsBrokenByMove(doc, ['blocks', 0, 'blocks', 0], ['blocks']),
+    ).toEqual([])
+    expect(
+      loopVarsBrokenByMove(memo.document, ['blocks', 4], ['blocks', 6, 'blocks']),
+    ).toEqual([])
+  })
+
+  it('loopVarsBrokenByMove includes outer loop variable when nested each using outer as is moved out of the outer loop', () => {
+    const doc = createBaseDoc([
+      {
+        type: 'each',
+        of: 'groups',
+        as: 'g',
+        blocks: [
+          {
+            type: 'each',
+            of: 'g.items',
+            as: 'item',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '{{g.title}}: {{item.name}}',
+              },
+            ],
+          },
+        ],
+      },
+    ])
+
+    // Moving the inner each block itself out of the outer loop breaks 'g' (while 'item' stays defined by the inner each)
+    expect(
+      loopVarsBrokenByMove(doc, ['blocks', 0, 'blocks', 0], ['blocks']),
+    ).toContain('g')
+    expect(
+      loopVarsBrokenByMove(doc, ['blocks', 0, 'blocks', 0], ['blocks']),
+    ).not.toContain('item')
+
+    // Moving the inner paragraph out of the outer loop includes outer name 'g' (and 'item')
+    const brokenLeaf = loopVarsBrokenByMove(
+      doc,
+      ['blocks', 0, 'blocks', 0, 'blocks', 0],
+      ['blocks'],
+    )
+    expect(brokenLeaf).toContain('g')
+    expect(brokenLeaf).toContain('item')
+  })
+
+  it('loopVarsBrokenByMove detects table rows.as when moving a block out of table rows', () => {
+    const doc = createBaseDoc([
+      {
+        type: 'table',
+        columns: [{ width: '*' }],
+        rows: {
+          each: 'items',
+          as: 'row',
+          cells: [
+            {
+              blocks: [{ type: 'paragraph', text: '{{row.name}}' }],
+            },
+          ],
+        },
+      },
+    ])
+
+    expect(
+      loopVarsBrokenByMove(
+        doc,
+        ['blocks', 0, 'rows', 'cells', 0, 'blocks', 0],
+        ['blocks'],
+      ),
+    ).toEqual(['row'])
+
+    expect(
+      loopVarsBrokenByMove(
+        doc,
+        ['blocks', 0, 'rows', 'cells', 0, 'blocks', 0],
+        ['blocks', 0, 'rows', 'cells', 0, 'blocks'],
+      ),
+    ).toEqual([])
   })
 })

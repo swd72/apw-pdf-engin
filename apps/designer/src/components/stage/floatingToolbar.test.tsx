@@ -92,7 +92,7 @@ describe('FloatingToolbar and toolbarPlacement', () => {
     expect(clampedRight).toEqual({ x: 435, y: 64, placement: 'above' })
   })
 
-  it('clicking Move up, Move down, Duplicate, Delete calls the editor and keeps selection as editor defines', () => {
+  it('clicking เลื่อนขึ้น, เลื่อนลง, ทำสำเนา, ลบ calls the editor and keeps selection as editor defines', () => {
     const doc = createDoc([
       { type: 'paragraph', text: 'แรก' },
       { type: 'paragraph', text: 'สอง' },
@@ -120,24 +120,24 @@ describe('FloatingToolbar and toolbarPlacement', () => {
       />,
     )
 
-    fireEvent.click(getByLabelText('Move up'))
+    fireEvent.click(getByLabelText('เลื่อนขึ้น'))
     expect(latestEditor!.selectedPath).toEqual(['blocks', 0])
     expect((latestEditor!.doc.blocks[0] as any).text).toBe('สอง')
 
-    fireEvent.click(getByLabelText('Move down'))
+    fireEvent.click(getByLabelText('เลื่อนลง'))
     expect(latestEditor!.selectedPath).toEqual(['blocks', 1])
     expect((latestEditor!.doc.blocks[1] as any).text).toBe('สอง')
 
-    fireEvent.click(getByLabelText('Duplicate'))
+    fireEvent.click(getByLabelText('ทำสำเนา'))
     expect(latestEditor!.doc.blocks.length).toBe(3)
     expect(latestEditor!.selectedPath).toEqual(['blocks', 2])
 
-    fireEvent.click(getByLabelText('Delete'))
+    fireEvent.click(getByLabelText('ลบ'))
     expect(latestEditor!.doc.blocks.length).toBe(2)
     expect(latestEditor!.selectedPath).toEqual(['blocks', 1])
   })
 
-  it('more menu holds Move into previous (disabled when canMoveInto is false), Move out, and Edit JSON', () => {
+  it('more menu holds ย้ายเข้าบล็อกก่อนหน้า (disabled when canMoveInto is false), ย้ายออกนอกกลุ่ม, and แก้ JSON', () => {
     const doc = createDoc([
       { type: 'paragraph', text: 'ย่อหน้าทั่วไป' },
       {
@@ -174,40 +174,74 @@ describe('FloatingToolbar and toolbarPlacement', () => {
       />,
     )
 
-    // On blocks[0], Move into previous and Move out are both disabled
+    // On blocks[0], ย้ายเข้าบล็อกก่อนหน้า and ย้ายออกนอกกลุ่ม are both disabled
     fireEvent.click(getByLabelText('ตัวเลือกบล็อก'))
-    const moveIntoBtn = getByLabelText('Move into previous') as HTMLButtonElement
-    const moveOutBtn = getByLabelText('Move out') as HTMLButtonElement
+    const moveIntoBtn = getByLabelText('ย้ายเข้าบล็อกก่อนหน้า') as HTMLButtonElement
+    const moveOutBtn = getByLabelText('ย้ายออกนอกกลุ่ม') as HTMLButtonElement
     expect(moveIntoBtn.disabled).toBe(true)
     expect(moveOutBtn.disabled).toBe(true)
 
-    // Edit JSON calls onEditJson(path)
-    fireEvent.click(getByLabelText('Edit JSON'))
+    // แก้ JSON calls onEditJson(path)
+    fireEvent.click(getByLabelText('แก้ JSON'))
     expect(onEditJson).toHaveBeenCalledWith(['blocks', 0])
 
-    // Select blocks[2] (after each block) -> Move into previous is enabled
+    // Select blocks[2] (after each block) -> ย้ายเข้าบล็อกก่อนหน้า is enabled
     const box2 = document.querySelector<HTMLElement>(
       '[data-block-path="blocks.2"]',
     )!
     fireEvent.click(box2)
     fireEvent.click(getByLabelText('ตัวเลือกบล็อก'))
     const moveIntoBtn2 = getByLabelText(
-      'Move into previous',
+      'ย้ายเข้าบล็อกก่อนหน้า',
     ) as HTMLButtonElement
     expect(moveIntoBtn2.disabled).toBe(false)
     fireEvent.click(moveIntoBtn2)
     expect(latestEditor!.selectedPath).toEqual(['blocks', 1, 'blocks', 1])
 
-    // Select blocks[1].blocks[0] -> Move out is enabled
+    // Select blocks[1].blocks[0] -> ย้ายออกนอกกลุ่ม is enabled
     const nestedBox = document.querySelector<HTMLElement>(
       '[data-block-path="blocks.1.blocks.0"]',
     )!
     fireEvent.click(nestedBox)
     fireEvent.click(getByLabelText('ตัวเลือกบล็อก'))
-    const moveOutBtn2 = getByLabelText('Move out') as HTMLButtonElement
+    const moveOutBtn2 = getByLabelText('ย้ายออกนอกกลุ่ม') as HTMLButtonElement
     expect(moveOutBtn2.disabled).toBe(false)
     fireEvent.click(moveOutBtn2)
     expect(latestEditor!.selectedPath).toEqual(['blocks', 2])
+  })
+
+  it('disables ย้ายออกนอกกลุ่ม with tooltip when block inside loop references loop variable {{p}}', () => {
+    const doc = createDoc([
+      {
+        type: 'each',
+        of: 'body',
+        as: 'p',
+        blocks: [{ type: 'paragraph', text: '{{p}}' }],
+      },
+    ])
+    const page: PageInfo = {
+      width: 595,
+      height: 842,
+      content: { x: 85, y: 56, w: 453, h: 730 },
+      boxes: [
+        { path: 'blocks[0].blocks[0]', x: 85, y: 100, w: 453, h: 20 },
+      ],
+    }
+
+    const { getByLabelText } = render(
+      <ToolbarHarness
+        initialDoc={doc}
+        page={page}
+        initialSelected={['blocks', 0, 'blocks', 0]}
+      />,
+    )
+
+    fireEvent.click(getByLabelText('ตัวเลือกบล็อก'))
+    const moveOutBtn = getByLabelText('ย้ายออกนอกกลุ่ม') as HTMLButtonElement
+    expect(moveOutBtn.disabled).toBe(true)
+    expect(moveOutBtn.getAttribute('title')).toBe(
+      'ใช้ตัวแปร {{p}} ของลูป body — ย้ายออกนอกลูปไม่ได้',
+    )
   })
 
   it('renders toolbar only on the first box of the selected block and hides while inline editing', () => {

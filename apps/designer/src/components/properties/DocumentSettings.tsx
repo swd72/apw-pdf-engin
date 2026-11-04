@@ -9,6 +9,7 @@ import {
 import { Section } from './Section.js'
 import { Field } from './Field.js'
 import { AddProperty, type AddPropertyOption } from './AddProperty.js'
+import { LengthInput } from '../../ui/LengthInput.js'
 
 export interface DocumentSettingsProps {
   state?: EditorState
@@ -159,29 +160,27 @@ export function DocumentSettings({
 
         <div className="prop-row-2">
           <Field label="ขอบบน (top)" htmlFor="doc-margin-top">
-            <input
+            <LengthInput
               id="doc-margin-top"
-              type="text"
               aria-label="Margin top"
-              className="ui-input"
+              defaultUnit="cm"
               value={settings.margin.top}
-              onChange={(e) =>
+              onChange={(next) =>
                 updateSettings({
-                  margin: { ...settings.margin, top: e.target.value },
+                  margin: { ...settings.margin, top: next ?? '' },
                 })
               }
             />
           </Field>
           <Field label="ขอบล่าง (bottom)" htmlFor="doc-margin-bottom">
-            <input
+            <LengthInput
               id="doc-margin-bottom"
-              type="text"
               aria-label="Margin bottom"
-              className="ui-input"
+              defaultUnit="cm"
               value={settings.margin.bottom}
-              onChange={(e) =>
+              onChange={(next) =>
                 updateSettings({
-                  margin: { ...settings.margin, bottom: e.target.value },
+                  margin: { ...settings.margin, bottom: next ?? '' },
                 })
               }
             />
@@ -190,29 +189,27 @@ export function DocumentSettings({
 
         <div className="prop-row-2">
           <Field label="ขอบซ้าย (left)" htmlFor="doc-margin-left">
-            <input
+            <LengthInput
               id="doc-margin-left"
-              type="text"
               aria-label="Margin left"
-              className="ui-input"
+              defaultUnit="cm"
               value={settings.margin.left}
-              onChange={(e) =>
+              onChange={(next) =>
                 updateSettings({
-                  margin: { ...settings.margin, left: e.target.value },
+                  margin: { ...settings.margin, left: next ?? '' },
                 })
               }
             />
           </Field>
           <Field label="ขอบขวา (right)" htmlFor="doc-margin-right">
-            <input
+            <LengthInput
               id="doc-margin-right"
-              type="text"
               aria-label="Margin right"
-              className="ui-input"
+              defaultUnit="cm"
               value={settings.margin.right}
-              onChange={(e) =>
+              onChange={(next) =>
                 updateSettings({
-                  margin: { ...settings.margin, right: e.target.value },
+                  margin: { ...settings.margin, right: next ?? '' },
                 })
               }
             />

@@ -276,6 +276,82 @@ describe('PdfPreview overlay and boxes transport', () => {
     expect(overlayFn).toHaveBeenCalledWith(0, 1, SAMPLE_PAGES[0])
   })
 
+  it('forwards strict to the render request and fires onStatusChange with error and error object', async () => {
+    let callCount = 0
+    const renderSpy = vi.fn(async (): Promise<RenderResponse> => {
+      callCount++
+      if (callCount === 1) {
+        return {
+          id: 1,
+          ok: true,
+          bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46]),
+          pageCount: 1,
+          warnings: [],
+          pages: [SAMPLE_PAGES[0]!],
+        }
+      }
+      return {
+        id: 2,
+        ok: false,
+        error: {
+          code: 'MISSING_VARIABLE',
+          message: 'Missing variable "p"',
+        },
+      }
+    })
+    const client: RenderClient = {
+      render: renderSpy,
+      dispose: vi.fn(),
+    }
+
+    const onStatusChange = vi.fn()
+
+    const { rerender } = render(
+      <ApwPdfProvider fontBaseUrl="/fonts" wasmUrl="/hb.wasm" client={client}>
+        <PdfPreview
+          doc={DOC}
+          data={DATA_1}
+          strict={false}
+          debounceMs={10}
+          onStatusChange={onStatusChange}
+        />
+      </ApwPdfProvider>,
+    )
+
+    await act(async () => {
+      vi.advanceTimersByTime(10)
+    })
+
+    expect(renderSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ strict: false }),
+    )
+    expect(onStatusChange).toHaveBeenCalledWith('ready', undefined)
+
+    rerender(
+      <ApwPdfProvider fontBaseUrl="/fonts" wasmUrl="/hb.wasm" client={client}>
+        <PdfPreview
+          doc={DOC}
+          data={DATA_2}
+          strict={true}
+          debounceMs={10}
+          onStatusChange={onStatusChange}
+        />
+      </ApwPdfProvider>,
+    )
+
+    await act(async () => {
+      vi.advanceTimersByTime(10)
+    })
+
+    expect(renderSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ strict: true }),
+    )
+    expect(onStatusChange).toHaveBeenLastCalledWith('error', {
+      code: 'MISSING_VARIABLE',
+      message: 'Missing variable "p"',
+    })
+  })
+
   it('worker passes boxes to renderPdf', async () => {
     renderPdfMock.mockResolvedValue({
       bytes: new Uint8Array([1, 2, 3]),

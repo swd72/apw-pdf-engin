@@ -6,7 +6,7 @@ import type { ImageProvider } from '../fonts/provider.js'
 import { readImageInfo } from '../images/info.js'
 import { toPt, type pageBox } from '../units.js'
 import type { AnchorTable } from './align.js'
-import { glyphBoxes } from './boxes.js'
+import { glyphBoxes, parseInst } from './boxes.js'
 import { layoutParagraph, type LaidLine, type ParagraphLayout } from './paragraph.js'
 import type { BlockBox, LayoutItem, LayoutPage, Rect } from './tree.js'
 
@@ -28,6 +28,7 @@ export interface UnsplittableFragment {
   keepWithNext?: boolean
   minLinesBefore?: number
   path: string
+  inst?: string
   splittable: false
   items(yTop: number): LayoutItem[]
   paraLines?: LaidLine[]
@@ -45,6 +46,7 @@ export interface SplittableFragment {
   minLinesBefore?: number
   minHeadHeight: number
   path: string
+  inst?: string
   splittable: true
   items(yTop: number): LayoutItem[]
   split(avail: number): [Fragment, Fragment] | null
@@ -116,7 +118,7 @@ export function laidLinesToItems(
   return out
 }
 
-export function createParagraphFragment(layout: ParagraphLayout): Fragment {
+export function createParagraphFragment(layout: ParagraphLayout, inst?: string): Fragment {
   const { lines, spaceBefore, spaceAfter, keepWithNext, keepLinesTogether, widowControl, path } =
     layout
   const totalHeight = lines.reduce((s, l) => s + l.height, 0)
@@ -128,6 +130,7 @@ export function createParagraphFragment(layout: ParagraphLayout): Fragment {
       spaceAfter,
       keepWithNext,
       path,
+      ...(inst !== undefined ? { inst } : {}),
       splittable: false,
       paraLines: lines,
       items: (yTop: number) => laidLinesToItems(lines, yTop, path),
@@ -144,6 +147,7 @@ export function createParagraphFragment(layout: ParagraphLayout): Fragment {
     keepWithNext,
     minHeadHeight,
     path,
+    ...(inst !== undefined ? { inst } : {}),
     splittable: true,
     paraLines: lines,
     items: (yTop: number) => laidLinesToItems(lines, yTop, path),
@@ -173,25 +177,32 @@ export function createParagraphFragment(layout: ParagraphLayout): Fragment {
 
       const headLines = lines.slice(0, k)
       const tailLines = lines.slice(k)
+      const activeInst = this.inst ?? inst
 
-      const headFrag = createParagraphFragment({
-        lines: headLines,
-        spaceBefore,
-        spaceAfter: 0,
-        keepWithNext: false,
-        keepLinesTogether: true,
-        widowControl,
-        path,
-      })
-      const tailFrag = createParagraphFragment({
-        lines: tailLines,
-        spaceBefore: 0,
-        spaceAfter,
-        keepWithNext,
-        keepLinesTogether,
-        widowControl,
-        path,
-      })
+      const headFrag = createParagraphFragment(
+        {
+          lines: headLines,
+          spaceBefore,
+          spaceAfter: 0,
+          keepWithNext: false,
+          keepLinesTogether: true,
+          widowControl,
+          path,
+        },
+        activeInst,
+      )
+      const tailFrag = createParagraphFragment(
+        {
+          lines: tailLines,
+          spaceBefore: 0,
+          spaceAfter,
+          keepWithNext,
+          keepLinesTogether,
+          widowControl,
+          path,
+        },
+        activeInst,
+      )
       return [headFrag, tailFrag]
     },
   }
@@ -269,6 +280,7 @@ export async function layoutBlockToFragment(
           spaceBefore: 0,
           spaceAfter: 0,
           path,
+          ...(block.$inst ? { inst: block.$inst } : {}),
           splittable: false,
           items: () => [],
         },
@@ -288,6 +300,7 @@ export async function layoutBlockToFragment(
           spaceBefore,
           spaceAfter,
           path,
+          ...(block.$inst ? { inst: block.$inst } : {}),
           splittable: false,
           items: (yTop: number) => [
             {
@@ -360,6 +373,7 @@ export async function layoutBlockToFragment(
           spaceBefore: 0,
           spaceAfter,
           path,
+          ...(block.$inst ? { inst: block.$inst } : {}),
           splittable: false,
           items: (yTop: number) => [
             {
@@ -388,7 +402,7 @@ export async function layoutBlockToFragment(
         lineSpacing: ctx.doc.font.lineSpacing,
       })
       ctx.warnings.push(...warnings)
-      return { fragment: createParagraphFragment(layout) }
+      return { fragment: createParagraphFragment(layout, block.$inst) }
     }
 
     case 'table':
@@ -403,6 +417,9 @@ export async function layoutBlockToFragment(
       const fragment = await handler(block, ctx, x, width, path)
       if (block.type === 'table' && fragment.height === 0) {
         return {}
+      }
+      if (block.$inst && !fragment.inst) {
+        fragment.inst = block.$inst
       }
       return { fragment }
     }
@@ -445,7 +462,7 @@ export async function paginate(
 ): Promise<LayoutPage[]> {
   const pages: LayoutPage[] = []
   let pageEntries: PlacedPageEntry[] = []
-  let pageAnchoredItems: { item: LayoutItem; path: string }[] = []
+  let pageAnchoredItems: { item: LayoutItem; path: string; inst?: string }[] = []
   let pageIndex = 0
   let cursorY = ctx.bodyTop(0)
   let atAutoBreakTop = false
@@ -466,24 +483,28 @@ export async function paginate(
 
     for (const entry of pageEntries) {
       topPaths.add(entry.frag.path)
+      const inst = parseInst(entry.frag.inst)
       boxes.push({
         path: entry.frag.path,
         x: ctx.box.contentLeft,
         y: entry.yTop,
         w: ctx.box.contentWidth,
         h: entry.frag.height,
+        ...(inst !== undefined ? { inst } : {}),
       })
     }
 
     for (const anchored of pageAnchoredItems) {
       if (anchored.item.kind === 'image' || anchored.item.kind === 'rect') {
         topPaths.add(anchored.path)
+        const inst = parseInst(anchored.inst)
         boxes.push({
           path: anchored.path,
           x: anchored.item.x,
           y: anchored.item.y,
           w: anchored.item.w,
           h: anchored.item.h,
+          ...(inst !== undefined ? { inst } : {}),
         })
       }
     }
@@ -540,15 +561,18 @@ export async function paginate(
           if (pulledHeight + fragH <= remainingPullHeight + 1e-6) {
             pageEntries.pop()
             pulledFrags.unshift(
-              createParagraphFragment({
-                lines: pLines,
-                spaceBefore: lastEntry.frag.spaceBefore,
-                spaceAfter: lastEntry.frag.spaceAfter,
-                keepWithNext: true,
-                keepLinesTogether: true,
-                widowControl: false,
-                path: lastEntry.frag.path,
-              }),
+              createParagraphFragment(
+                {
+                  lines: pLines,
+                  spaceBefore: lastEntry.frag.spaceBefore,
+                  spaceAfter: lastEntry.frag.spaceAfter,
+                  keepWithNext: true,
+                  keepLinesTogether: true,
+                  widowControl: false,
+                  path: lastEntry.frag.path,
+                },
+                lastEntry.frag.inst,
+              ),
             )
             pulledHeight += fragH
             needed -= pLines.length
@@ -578,25 +602,32 @@ export async function paginate(
         const splitIdx = pLines.length - pullCount
         const remainLines = pLines.slice(0, splitIdx)
         const moveLines = pLines.slice(splitIdx)
-        lastEntry.frag = createParagraphFragment({
-          lines: remainLines,
-          spaceBefore: lastEntry.frag.spaceBefore,
-          spaceAfter: 0,
-          keepWithNext: false,
-          keepLinesTogether: true,
-          widowControl: false,
-          path: lastEntry.frag.path,
-        })
-        pulledFrags.unshift(
-          createParagraphFragment({
-            lines: moveLines,
-            spaceBefore: 0,
-            spaceAfter: lastEntry.frag.spaceAfter,
-            keepWithNext: true,
+        const prevInst = lastEntry.frag.inst
+        lastEntry.frag = createParagraphFragment(
+          {
+            lines: remainLines,
+            spaceBefore: lastEntry.frag.spaceBefore,
+            spaceAfter: 0,
+            keepWithNext: false,
             keepLinesTogether: true,
             widowControl: false,
             path: lastEntry.frag.path,
-          }),
+          },
+          prevInst,
+        )
+        pulledFrags.unshift(
+          createParagraphFragment(
+            {
+              lines: moveLines,
+              spaceBefore: 0,
+              spaceAfter: lastEntry.frag.spaceAfter,
+              keepWithNext: true,
+              keepLinesTogether: true,
+              widowControl: false,
+              path: lastEntry.frag.path,
+            },
+            prevInst,
+          ),
         )
         pulledHeight += accH
         needed -= pullCount
@@ -647,7 +678,7 @@ export async function paginate(
   // First layout blocks sequentially so anchors defined in earlier blocks are visible to later blocks
   type FlowStep =
     | { kind: 'pageBreak' }
-    | { kind: 'anchored'; item: LayoutItem; path: string }
+    | { kind: 'anchored'; item: LayoutItem; path: string; inst?: string }
     | { kind: 'fragment'; frag: Fragment }
 
   const steps: FlowStep[] = []
@@ -664,8 +695,11 @@ export async function paginate(
     if (res.pageBreak) {
       steps.push({ kind: 'pageBreak' })
     } else if (res.anchoredItem) {
-      steps.push({ kind: 'anchored', item: res.anchoredItem, path })
+      steps.push({ kind: 'anchored', item: res.anchoredItem, path, inst: b.$inst })
     } else if (res.fragment) {
+      if (b.$inst && !res.fragment.inst) {
+        res.fragment.inst = b.$inst
+      }
       steps.push({ kind: 'fragment', frag: res.fragment })
     }
   }
@@ -680,7 +714,7 @@ export async function paginate(
       continue
     }
     if (step.kind === 'anchored') {
-      pageAnchoredItems.push({ item: step.item, path: step.path })
+      pageAnchoredItems.push({ item: step.item, path: step.path, inst: step.inst })
       sIdx++
       continue
     }

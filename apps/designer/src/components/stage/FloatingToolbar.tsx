@@ -2,8 +2,10 @@ import React, { useMemo } from 'react'
 import type { Block, Rect } from '@apw-pdf/core'
 import type { EditorState } from '../../editor/useEditorState.js'
 import {
+  getBlock,
   listChildren,
   canMoveInto,
+  loopMoveGuardTitle,
   type BlockPath,
 } from '../../editor/docModel.js'
 import { IconButton } from '../../ui/IconButton.js'
@@ -59,10 +61,25 @@ export function FloatingToolbar({
 
   const isFirst = typeof index !== 'number' || index <= 0
   const isLast = typeof index !== 'number' || index >= parentList.length - 1
-  const canMoveOut = parentListPath.length > 1
+
+  let outerListPath: BlockPath | null = null
+  if (parentListPath.length > 1) {
+    for (let k = path.length - 1; k >= 1; k--) {
+      const sub = path.slice(0, k)
+      if (getBlock(doc, sub)) {
+        outerListPath = sub.slice(0, -1)
+        break
+      }
+    }
+  }
+  const moveOutGuardTitle = outerListPath
+    ? loopMoveGuardTitle(doc, path, outerListPath)
+    : undefined
+  const canMoveOut = parentListPath.length > 1 && !moveOutGuardTitle
 
   let canMoveIntoPrev = false
   let targetListPath: BlockPath | null = null
+  let moveIntoPrevGuardTitle: string | undefined
   if (typeof index === 'number' && index > 0) {
     const prevBlock = parentList[index - 1]
     if (prevBlock) {
@@ -73,7 +90,14 @@ export function FloatingToolbar({
           index - 1,
           ...prevChildren[prevChildren.length - 1]!.key,
         ]
-        canMoveIntoPrev = canMoveInto(doc, path, targetListPath)
+        if (canMoveInto(doc, path, targetListPath)) {
+          moveIntoPrevGuardTitle = loopMoveGuardTitle(
+            doc,
+            path,
+            targetListPath,
+          )
+          canMoveIntoPrev = !moveIntoPrevGuardTitle
+        }
       }
     }
   }
@@ -81,8 +105,9 @@ export function FloatingToolbar({
   const menuItems = useMemo<MenuItem[]>(
     () => [
       {
-        label: 'Move into previous',
+        label: 'ย้ายเข้าบล็อกก่อนหน้า',
         disabled: !canMoveIntoPrev,
+        title: moveIntoPrevGuardTitle,
         onSelect: () => {
           if (targetListPath) {
             moveSelectedInto(targetListPath)
@@ -90,14 +115,15 @@ export function FloatingToolbar({
         },
       },
       {
-        label: 'Move out',
+        label: 'ย้ายออกนอกกลุ่ม',
         disabled: !canMoveOut,
+        title: moveOutGuardTitle,
         onSelect: () => {
           moveSelectedOut()
         },
       },
       {
-        label: 'Edit JSON',
+        label: 'แก้ JSON',
         onSelect: () => {
           onEditJson?.(path)
         },
@@ -106,6 +132,8 @@ export function FloatingToolbar({
     [
       canMoveIntoPrev,
       canMoveOut,
+      moveIntoPrevGuardTitle,
+      moveOutGuardTitle,
       targetListPath,
       path,
       moveSelectedInto,
@@ -131,24 +159,24 @@ export function FloatingToolbar({
       onDoubleClick={(e) => e.stopPropagation()}
     >
       <IconButton
-        label="Move up"
+        label="เลื่อนขึ้น"
         icon={<UpIcon size={16} />}
         disabled={isFirst}
         onClick={() => moveSelected(-1)}
       />
       <IconButton
-        label="Move down"
+        label="เลื่อนลง"
         icon={<DownIcon size={16} />}
         disabled={isLast}
         onClick={() => moveSelected(1)}
       />
       <IconButton
-        label="Duplicate"
+        label="ทำสำเนา"
         icon={<CopyIcon size={16} />}
         onClick={() => duplicateSelected()}
       />
       <IconButton
-        label="Delete"
+        label="ลบ"
         icon={<TrashIcon size={16} />}
         danger
         onClick={() => removeSelected()}

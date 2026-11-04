@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
+import type { Block, DocumentDef } from '@apw-pdf/core'
 import {
   isUsableKey,
   renameKey,
@@ -14,7 +15,89 @@ import { Chip } from '../../ui/Chip.js'
 
 export interface DataViewProps {
   data: unknown
+  doc?: DocumentDef
   onChange(next: unknown): void
+}
+
+function collectLoopVars(doc: DocumentDef | undefined): Map<string, string> {
+  const map = new Map<string, string>()
+  if (!doc || !Array.isArray(doc.blocks)) return map
+
+  function walkBlocks(blocks: Block[]) {
+    for (const block of blocks) {
+      if (!block || typeof block !== 'object') continue
+      switch (block.type) {
+        case 'each': {
+          if (block.as && block.of && !map.has(block.as)) {
+            map.set(block.as, block.of)
+          }
+          if (Array.isArray(block.blocks)) {
+            walkBlocks(block.blocks)
+          }
+          break
+        }
+        case 'if': {
+          if (Array.isArray(block.then)) walkBlocks(block.then)
+          if (Array.isArray(block.else)) walkBlocks(block.else)
+          break
+        }
+        case 'columns': {
+          if (Array.isArray(block.columns)) {
+            for (const col of block.columns) {
+              if (Array.isArray(col.blocks)) walkBlocks(col.blocks)
+            }
+          }
+          break
+        }
+        case 'table': {
+          if (Array.isArray(block.header)) {
+            for (const row of block.header) {
+              if (Array.isArray(row)) {
+                for (const cell of row) {
+                  if (Array.isArray(cell?.blocks)) walkBlocks(cell.blocks)
+                }
+              }
+            }
+          }
+          if (Array.isArray(block.rows)) {
+            for (const row of block.rows) {
+              if (Array.isArray(row)) {
+                for (const cell of row) {
+                  if (Array.isArray(cell?.blocks)) walkBlocks(cell.blocks)
+                }
+              }
+            }
+          } else if (block.rows && typeof block.rows === 'object') {
+            if (
+              block.rows.as &&
+              block.rows.each &&
+              !map.has(block.rows.as)
+            ) {
+              map.set(block.rows.as, block.rows.each)
+            }
+            if (Array.isArray(block.rows.cells)) {
+              for (const cell of block.rows.cells) {
+                if (Array.isArray(cell?.blocks)) walkBlocks(cell.blocks)
+              }
+            }
+          }
+          if (Array.isArray(block.footer)) {
+            for (const row of block.footer) {
+              if (Array.isArray(row)) {
+                for (const cell of row) {
+                  if (Array.isArray(cell?.blocks)) walkBlocks(cell.blocks)
+                }
+              }
+            }
+          }
+          break
+        }
+      }
+    }
+  }
+
+  walkBlocks(doc.blocks)
+  return map
 }
 
 const DATA_TYPES: PathInfo['type'][] = [
@@ -114,12 +197,13 @@ function TypeChipMenu({
   )
 }
 
-export function DataView({ data, onChange }: DataViewProps) {
+export function DataView({ data, doc, onChange }: DataViewProps) {
   const [renameErrors, setRenameErrors] = useState<Record<string, string>>({})
   const [convertErrors, setConvertErrors] = useState<Record<string, string>>({})
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({})
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const keyInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const loopVars = useMemo(() => collectLoopVars(doc), [doc])
 
   const toggleCollapse = (pathKey: string) => {
     setCollapsed((prev) => ({ ...prev, [pathKey]: !prev[pathKey] }))
@@ -313,6 +397,7 @@ export function DataView({ data, onChange }: DataViewProps) {
           const isCollection = itemType === 'object' || itemType === 'array'
           const isCollapsed = Boolean(collapsed[itemPathKey])
           const usable = isUsableKey(k)
+          const loopOf = path.length === 0 ? loopVars.get(k) : undefined
           const renameErr = renameErrors[itemPathKey]
           const convertErr = convertErrors[itemPathKey]
           const draftKey = keyDrafts[itemPathKey] ?? k
@@ -383,6 +468,15 @@ export function DataView({ data, onChange }: DataViewProps) {
 
                   {!usable && (
                     <Chip tone="warn">not usable in {'{{ }}'}</Chip>
+                  )}
+
+                  {loopOf !== undefined && (
+                    <span
+                      className="ui-chip ui-chip--warn"
+                      title={`ไม่มีผลในลูป — ข้อความในลูปมาจากรายการของ ${loopOf}`}
+                    >
+                      ชื่อซ้ำกับตัวแปรวนซ้ำ
+                    </span>
                   )}
                 </div>
 

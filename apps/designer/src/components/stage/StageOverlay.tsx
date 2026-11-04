@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import type { BlockBox, PageInfo } from '@apw-pdf/core'
 import type { EditorState } from '../../editor/useEditorState.js'
 import { getBlock, type BlockPath } from '../../editor/docModel.js'
@@ -8,10 +8,10 @@ import { hitOrder, scaleRect } from './overlayGeometry.js'
 import { FloatingToolbar } from './FloatingToolbar.js'
 import {
   InlineTextEditor,
-  commitEditTarget,
   editTarget,
   type EditTarget,
 } from './InlineTextEditor.js'
+import { innermostEachOf } from './dataSource.js'
 
 export interface StageOverlayProps {
   pageIndex: number
@@ -21,6 +21,7 @@ export interface StageOverlayProps {
   showGuides?: boolean
   showToolbar?: boolean
   editing?: boolean
+  stale?: boolean
   onEditJson?(path: BlockPath): void
   onFocusProperties?(): void
   onSelectFromOverlay?(path: BlockPath | null): void
@@ -34,6 +35,7 @@ export function StageOverlay({
   showGuides = true,
   showToolbar = true,
   editing = false,
+  stale = false,
   onEditJson,
   onFocusProperties,
   onSelectFromOverlay,
@@ -43,6 +45,13 @@ export function StageOverlay({
     target: EditTarget
     box: BlockBox
   } | null>(null)
+
+  useEffect(() => {
+    if (stale) {
+      setHoveredIndex(null)
+      setEditingState(null)
+    }
+  }, [stale])
 
   const isEditing = editing || editingState !== null
 
@@ -89,7 +98,7 @@ export function StageOverlay({
         editor.select(null)
       }}
       onKeyDown={(e) => {
-        if (isEditing) return
+        if (stale || isEditing) return
         const targetEl = e.target as HTMLElement | null
         if (
           targetEl &&
@@ -130,85 +139,94 @@ export function StageOverlay({
         />
       )}
 
-      {orderedBoxes.map((box, idx) => {
-        const resolved = resolveSelection(editor.doc, box.path)
-        if (!resolved) return null
-        const block = getBlock(editor.doc, resolved.blockPath)
-        if (!block) return null
+      {!stale &&
+        orderedBoxes.map((box, idx) => {
+          const resolved = resolveSelection(editor.doc, box.path)
+          if (!resolved) return null
+          const block = getBlock(editor.doc, resolved.blockPath)
+          if (!block) return null
 
-        const label = blockMeta(block.type).label
-        const bKey = pathKey(resolved.blockPath)
-        const isSelected = Boolean(selectedKey) && bKey === selectedKey
-        const isHovered = hoveredIndex === idx
-        const rect = scaleRect(box, scale)
+          const label = blockMeta(block.type).label
+          const loopOf = innermostEachOf(editor.doc, resolved.blockPath)
+          const badgeText = loopOf ? `${label} · ซ้ำตาม ${loopOf}` : label
+          const bKey = pathKey(resolved.blockPath)
+          const isSelected = Boolean(selectedKey) && bKey === selectedKey
+          const isHovered = hoveredIndex === idx
+          const rect = scaleRect(box, scale)
 
-        const classes = [
-          'stage-box',
-          isHovered ? 'stage-box--hover' : '',
-          isSelected ? 'stage-box--selected' : '',
-        ]
-          .filter(Boolean)
-          .join(' ')
+          const classes = [
+            'stage-box',
+            isHovered ? 'stage-box--hover' : '',
+            isSelected ? 'stage-box--selected' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')
 
-        return (
-          <div
-            key={`${box.path}-${idx}`}
-            role="button"
-            aria-label={label}
-            tabIndex={-1}
-            data-block-path={bKey}
-            data-source-path={box.path}
-            className={classes}
-            style={{
-              left: `${rect.x}px`,
-              top: `${rect.y}px`,
-              width: `${rect.w}px`,
-              height: `${rect.h}px`,
-            }}
-            onMouseEnter={() => setHoveredIndex(idx)}
-            onMouseLeave={() =>
-              setHoveredIndex((prev) => (prev === idx ? null : prev))
-            }
-            onClick={(e) => {
-              e.stopPropagation()
-              onSelectFromOverlay?.(resolved.blockPath)
-              editor.select(resolved.blockPath)
-            }}
-            onDoubleClick={(e) => {
-              e.stopPropagation()
-              onSelectFromOverlay?.(resolved.blockPath)
-              editor.select(resolved.blockPath)
-              const target = editTarget(editor.doc, resolved)
-              if (target) {
-                setEditingState({ target, box })
-              } else {
-                onFocusProperties?.()
+          return (
+            <div
+              key={`${box.path}-${idx}`}
+              role="button"
+              aria-label={label}
+              tabIndex={-1}
+              data-block-path={bKey}
+              data-source-path={box.path}
+              className={classes}
+              style={{
+                left: `${rect.x}px`,
+                top: `${rect.y}px`,
+                width: `${rect.w}px`,
+                height: `${rect.h}px`,
+              }}
+              onMouseEnter={() => setHoveredIndex(idx)}
+              onMouseLeave={() =>
+                setHoveredIndex((prev) => (prev === idx ? null : prev))
               }
-            }}
-          >
-            {isHovered && <span className="stage-box__badge">{label}</span>}
-          </div>
-        )
-      })}
+              onClick={(e) => {
+                e.stopPropagation()
+                onSelectFromOverlay?.(resolved.blockPath)
+                editor.select(resolved.blockPath)
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation()
+                onSelectFromOverlay?.(resolved.blockPath)
+                editor.select(resolved.blockPath)
+                const target = editTarget(editor.doc, resolved)
+                if (target) {
+                  setEditingState({ target, box })
+                } else {
+                  onFocusProperties?.()
+                }
+              }}
+            >
+              {isHovered && (
+                <span className="stage-box__badge">{badgeText}</span>
+              )}
+            </div>
+          )
+        })}
 
-      {showToolbar && !isEditing && firstSelectedBox && scaledSelectedBox && (
-        <FloatingToolbar
-          editor={editor}
-          path={firstSelectedBox.blockPath}
-          box={scaledSelectedBox}
-          stage={stageSize}
-          onEditJson={onEditJson}
-        />
-      )}
+      {!stale &&
+        showToolbar &&
+        !isEditing &&
+        firstSelectedBox &&
+        scaledSelectedBox && (
+          <FloatingToolbar
+            editor={editor}
+            path={firstSelectedBox.blockPath}
+            box={scaledSelectedBox}
+            stage={stageSize}
+            onEditJson={onEditJson}
+          />
+        )}
 
-      {editingState && (
+      {!stale && editingState && (
         <InlineTextEditor
           editor={editor}
           target={editingState.target}
+          inst={editingState.box.inst}
           box={scaleRect(editingState.box, scale)}
           scale={scale}
-          onCommit={(nextText) => {
-            commitEditTarget(editor, editingState.target, nextText)
+          onCommit={() => {
             setEditingState(null)
           }}
           onCancel={() => {

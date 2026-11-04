@@ -10,10 +10,22 @@ import type { EditorState } from '../../editor/useEditorState.js'
 import { getBlock, type BlockPath } from '../../editor/docModel.js'
 import { scopeAt } from '../../editor/bindings.js'
 import { VariablePicker } from '../properties/VariablePicker.js'
+import {
+  dataSourceOf,
+  getInData,
+  innermostEachOf,
+  setIn,
+} from './dataSource.js'
 
 export type EditTarget =
-  | { kind: 'paragraph'; path: BlockPath; text: string }
-  | { kind: 'cell'; tablePath: BlockPath; cellPath: BlockPath; text: string }
+  | { kind: 'paragraph'; path: BlockPath; text: string; inst?: number[] }
+  | {
+      kind: 'cell'
+      tablePath: BlockPath
+      cellPath: BlockPath
+      text: string
+      inst?: number[]
+    }
 
 function getIn(obj: unknown, path: BlockPath): unknown {
   let curr: any = obj
@@ -172,22 +184,60 @@ export function commitEditTarget(
 export interface InlineTextEditorProps {
   editor: EditorState
   target: EditTarget
+  inst?: number[]
   box: Rect
   scale: number
-  onCommit(text: string): void
-  onCancel(): void
+  onCommit?(text: string): void
+  onCancel?(): void
 }
 
 export function InlineTextEditor({
   editor,
   target,
+  inst,
   box,
   scale,
   onCommit,
   onCancel,
 }: InlineTextEditorProps) {
-  const [draft, setDraft] = useState<string>(target.text)
-  const draftRef = useRef<string>(target.text)
+  const effectiveInst = inst ?? target.inst
+
+  const dataSource = useMemo(
+    () =>
+      target.kind === 'paragraph'
+        ? dataSourceOf(editor.doc, target.path, effectiveInst)
+        : null,
+    [editor.doc, target, effectiveInst],
+  )
+
+  const loopOf = useMemo(
+    () =>
+      target.kind === 'paragraph'
+        ? innermostEachOf(editor.doc, target.path)
+        : null,
+    [editor.doc, target],
+  )
+
+  const initialDataValue = useMemo(() => {
+    if (dataSource && 'dataPath' in dataSource) {
+      return getInData(editor.data, dataSource.dataPath)
+    }
+    return undefined
+  }, [dataSource, editor.data])
+
+  const canEditData =
+    dataSource !== null &&
+    'dataPath' in dataSource &&
+    (typeof initialDataValue === 'string' ||
+      typeof initialDataValue === 'number')
+
+  const initialMode: 'data' | 'template' = canEditData ? 'data' : 'template'
+  const initialText = canEditData ? String(initialDataValue) : target.text
+
+  const [mode, setMode] = useState<'data' | 'template'>(initialMode)
+  const modeRef = useRef<'data' | 'template'>(initialMode)
+  const [draft, setDraft] = useState<string>(initialText)
+  const draftRef = useRef<string>(initialText)
   const closedRef = useRef(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -215,16 +265,47 @@ export function InlineTextEditor({
     [editor.doc, blockPath],
   )
 
+  const handleToggleMode = useCallback(() => {
+    const nextMode = modeRef.current === 'data' ? 'template' : 'data'
+    modeRef.current = nextMode
+    setMode(nextMode)
+    const nextText =
+      nextMode === 'template' ? target.text : String(initialDataValue ?? '')
+    updateDraft(nextText)
+    textareaRef.current?.focus({ preventScroll: true })
+  }, [target.text, initialDataValue, updateDraft])
+
   const commit = useCallback(() => {
     if (closedRef.current) return
     closedRef.current = true
-    onCommit(draftRef.current)
-  }, [onCommit])
+    const text = draftRef.current
+    if (
+      modeRef.current === 'data' &&
+      canEditData &&
+      dataSource &&
+      'dataPath' in dataSource
+    ) {
+      let newValue: string | number = text
+      if (typeof initialDataValue === 'number') {
+        const trimmed = text.trim()
+        if (trimmed !== '') {
+          const parsed = Number(trimmed)
+          if (Number.isFinite(parsed)) {
+            newValue = parsed
+          }
+        }
+      }
+      editor.setData(setIn(editor.data, dataSource.dataPath, newValue))
+    } else {
+      commitEditTarget(editor, target, text)
+    }
+    onCommit?.(text)
+  }, [canEditData, dataSource, initialDataValue, editor, target, onCommit])
 
   const cancel = useCallback(() => {
     if (closedRef.current) return
     closedRef.current = true
-    onCancel()
+    onCancel?.()
   }, [onCancel])
 
   const captureCaret = useCallback(() => {
@@ -307,6 +388,24 @@ export function InlineTextEditor({
     commit()
   }
 
+  let headerText: string | null = null
+  if (canEditData && dataSource && 'dataPath' in dataSource) {
+    headerText =
+      mode === 'data'
+        ? `ข้อความจากข้อมูล ${dataSource.label}`
+        : `แม่แบบ (มีผลทุกรายการใน ${loopOf ?? ''})`
+  } else if (dataSource !== null) {
+    if ('repeatOf' in dataSource) {
+      headerText = `ซ้ำตาม ${dataSource.repeatOf} · รายการที่ ${dataSource.itemIndex + 1}`
+    } else if (loopOf) {
+      const itemIdx =
+        effectiveInst && effectiveInst.length > 0
+          ? effectiveInst[effectiveInst.length - 1]!
+          : 0
+      headerText = `ซ้ำตาม ${loopOf} · รายการที่ ${itemIdx + 1}`
+    }
+  }
+
   return (
     <div
       ref={containerRef}
@@ -315,6 +414,28 @@ export function InlineTextEditor({
       onMouseDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
     >
+      {headerText && (
+        <div
+          className="stage-inline-editor__header"
+          style={{
+            left: `${box.x}px`,
+            top: `${box.y}px`,
+          }}
+        >
+          <span className="stage-inline-editor__header-label">{headerText}</span>
+          {canEditData && (
+            <button
+              type="button"
+              className="stage-inline-editor__toggle"
+              aria-pressed={mode === 'template'}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleToggleMode}
+            >
+              แก้แม่แบบ
+            </button>
+          )}
+        </div>
+      )}
       <textarea
         ref={textareaRef}
         aria-label="แก้ไขข้อความ"

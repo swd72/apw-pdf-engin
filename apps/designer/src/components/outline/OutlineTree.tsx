@@ -4,6 +4,7 @@ import type { EditorState } from '../../editor/useEditorState.js'
 import {
   listChildren,
   canMoveInto,
+  loopVarsBrokenByMove,
   type BlockPath,
 } from '../../editor/docModel.js'
 import { PRESETS, type PresetDescriptor } from '../../editor/presets.js'
@@ -192,7 +193,10 @@ export function OutlineTree({
       activeDraggedOutlinePath = null
       if (!from || from.length === 0) return
 
-      if (!canMoveInto(doc, from, listPath)) {
+      if (
+        !canMoveInto(doc, from, listPath) ||
+        loopVarsBrokenByMove(doc, from, listPath).length > 0
+      ) {
         return
       }
 
@@ -223,6 +227,18 @@ export function OutlineTree({
     (e: React.DragEvent, listPath: BlockPath, slotIndex: number) => {
       e.preventDefault()
       e.stopPropagation()
+      const from = readDraggedPath(e)
+      if (
+        from &&
+        (!canMoveInto(doc, from, listPath) ||
+          loopVarsBrokenByMove(doc, from, listPath).length > 0)
+      ) {
+        if (e.dataTransfer && 'dropEffect' in e.dataTransfer) {
+          e.dataTransfer.dropEffect = 'none'
+        }
+        setActiveDrop(null)
+        return
+      }
       if (e.dataTransfer && 'dropEffect' in e.dataTransfer) {
         e.dataTransfer.dropEffect = 'move'
       }
@@ -233,7 +249,7 @@ export function OutlineTree({
           : { listKey, index: slotIndex },
       )
     },
-    [],
+    [doc],
   )
 
   const handleDragOverRow = useCallback(

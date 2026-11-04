@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import type { PageInfo } from '@apw-pdf/core'
-import { usePdf } from './usePdf.js'
+import { usePdf, type UsePdfState } from './usePdf.js'
 
 const PAGE_WRAP_STYLE: React.CSSProperties = { position: 'relative' }
 const PAGE_OVERLAY_STYLE: React.CSSProperties = {
@@ -15,6 +15,7 @@ export interface PdfPreviewProps {
   className?: string
   pageClassName?: string
   debounceMs?: number
+  strict?: boolean
   onPageCountChange?: (pageCount: number) => void
   renderOverlay?: (
     pageIndex: number,
@@ -22,6 +23,10 @@ export interface PdfPreviewProps {
     page: PageInfo,
   ) => React.ReactNode
   onPagesChange?: (pages: PageInfo[]) => void
+  onStatusChange?: (
+    status: UsePdfState['status'],
+    error?: { code: string; message: string },
+  ) => void
 }
 
 export function PdfPreview({
@@ -31,13 +36,16 @@ export function PdfPreview({
   className,
   pageClassName,
   debounceMs,
+  strict,
   onPageCountChange,
   renderOverlay,
   onPagesChange,
+  onStatusChange,
 }: PdfPreviewProps) {
   const wantBoxes = Boolean(renderOverlay || onPagesChange)
   const { bytes, pageCount, pages, status, error } = usePdf(doc, data, {
     debounceMs,
+    strict,
     boxes: wantBoxes,
   })
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([])
@@ -52,6 +60,8 @@ export function PdfPreview({
   onPageCountRef.current = onPageCountChange
   const onPagesRef = useRef(onPagesChange)
   onPagesRef.current = onPagesChange
+  const onStatusRef = useRef(onStatusChange)
+  onStatusRef.current = onStatusChange
 
   useEffect(() => {
     if (status === 'ready' && typeof pageCount === 'number' && pageCount > 0) {
@@ -64,6 +74,10 @@ export function PdfPreview({
       onPagesRef.current?.(pages)
     }
   }, [pages])
+
+  useEffect(() => {
+    onStatusRef.current?.(status, error)
+  }, [status, error])
 
   useEffect(() => {
     if (status !== 'ready' || !bytes || !pageCount) return
