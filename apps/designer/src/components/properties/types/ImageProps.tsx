@@ -7,6 +7,7 @@ import { Section } from '../Section.js'
 import { Field } from '../Field.js'
 import { AddProperty, type AddPropertyOption } from '../AddProperty.js'
 import { BindableInput } from '../VariablePicker.js'
+import { LengthInput } from '../../../ui/LengthInput.js'
 import { commitBlockPatch, isPropertySet } from '../shared.js'
 
 export interface ImagePropsProps {
@@ -97,18 +98,16 @@ export function ImageProps({ block, path, state }: ImagePropsProps) {
               htmlFor="img-width"
               onReset={() => resetKey('width')}
             >
-              <input
+              <LengthInput
                 id="img-width"
-                type="text"
                 aria-label="Image width"
-                className="ui-input"
-                value={(block.width as string) ?? ''}
-                onChange={(e) =>
+                defaultUnit="cm"
+                value={block.width}
+                onChange={(next) =>
                   commitBlockPatch(state, path, block, {
-                    width: e.target.value === '' ? undefined : e.target.value,
+                    width: next,
                   })
                 }
-                placeholder="เช่น 3cm, 80pt"
               />
             </Field>
           )}
@@ -119,18 +118,16 @@ export function ImageProps({ block, path, state }: ImagePropsProps) {
               htmlFor="img-height"
               onReset={() => resetKey('height')}
             >
-              <input
+              <LengthInput
                 id="img-height"
-                type="text"
                 aria-label="Image height"
-                className="ui-input"
-                value={(block.height as string) ?? ''}
-                onChange={(e) =>
+                defaultUnit="cm"
+                value={block.height}
+                onChange={(next) =>
                   commitBlockPatch(state, path, block, {
-                    height: e.target.value === '' ? undefined : e.target.value,
+                    height: next,
                   })
                 }
-                placeholder="เช่น 3cm"
               />
             </Field>
           )}

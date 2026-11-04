@@ -144,6 +144,7 @@ APW_PDF_TEMPLATE_DIR="C:/project/apw-pdf-engin/saved-templates" npx pnpm@9 --fil
     - **Undo / Redo & Margin Guides**: รองรับ `Ctrl+Z` (ย้อนกลับ) และ `Ctrl+Shift+Z` / `Ctrl+Y` (ทำซ้ำ) โดยรวมการพิมพ์ต่อเนื่องเป็นขั้นเดียว พร้อมปุ่มเปิด/ปิดเส้นขอบกระดาษ (Margin guides) บนแถบเครื่องมือพรีวิว และแถบแจ้งเตือน `PDF ไม่ได้อัปเดต` เมื่อการเรนเดอร์ล้มเหลว
   - **Thai Government Presets (`สำเร็จรูป`)**: เมนู `+ เพิ่ม` มีชุดบล็อกสำเร็จรูปมาตรฐานราชการไทย (`หัวบันทึกข้อความ`, `หัวหนังสือภายนอก`, `บล็อกอนุมัติ 2 ฝั่ง`, `ตารางรายการพร้อมยอดรวม`) ที่แทรกกลุ่มบล็อกพร้อมเติมคีย์ข้อมูลตัวอย่างที่ยังขาดให้อัตโนมัติโดยไม่เขียนทับค่าเดิม
   - **Outline / Data / Properties**: จัดลำดับและลากวางบล็อกในโครงสร้าง (พร้อมป้องกันการลากบล็อกที่ใช้ตัวแปรลูปออกนอกลูป), แก้ไขข้อมูล JSON แบบอิสระในแผงข้อมูล และปรับแต่งค่าเฉพาะของแต่ละบล็อกอย่างละเอียด (เช่น `thaiDistributed`, ตาราง `each`, บล็อกลายเซ็น) ในแผงคุณสมบัติ
+  - **Length Input (`LengthInput`)**: Every `Length` field in the Properties panel uses a numeric input paired with a unit selector (`pt`, `mm`, `cm`, `in`) that supports keyboard stepping (`ArrowUp`/`ArrowDown` and `Shift` ×10) and automatic unit conversion while preserving physical distance.
 - **Variable Binding (`{{ }}`) & Filters**:
   - เมื่อพิมพ์ `{{` ในช่องข้อความ ระบบจะแนะนำ path ของตัวแปรจาก Data Panel และ loop variables ในขอบเขตของบล็อกนั้นโดยอัตโนมัติ
   - เมื่อพิมพ์ `|` จะแสดงรายชื่อตัวกรองมาตรฐานจาก `@apw-pdf/core` (`thaiDate`, `thaiNum`, `baht`, `number`, `prefix`, `default`, `upper`, `lower`)

@@ -7,6 +7,7 @@ import { Section } from '../Section.js'
 import { Field } from '../Field.js'
 import { AddProperty, type AddPropertyOption } from '../AddProperty.js'
 import { BindableInput } from '../VariablePicker.js'
+import { LengthInput } from '../../../ui/LengthInput.js'
 import { commitBlockPatch, isPropertySet } from '../shared.js'
 
 export interface ParagraphPropsProps {
@@ -176,14 +177,12 @@ export function ParagraphProps({ block, path, state }: ParagraphPropsProps) {
             htmlFor="p-indent-left"
             onReset={() => resetKey('indentLeft')}
           >
-            <input
+            <LengthInput
               id="p-indent-left"
-              type="text"
               aria-label="Left indent"
-              className="ui-input"
-              value={(block.indentLeft as string) ?? ''}
-              onChange={(e) => setOptionalString('indentLeft', e.target.value)}
-              placeholder="เช่น 1cm, 24pt"
+              defaultUnit="cm"
+              value={block.indentLeft}
+              onChange={(next) => setOptionalString('indentLeft', next ?? '')}
             />
           </Field>
         )}
@@ -194,14 +193,12 @@ export function ParagraphProps({ block, path, state }: ParagraphPropsProps) {
             htmlFor="p-indent-right"
             onReset={() => resetKey('indentRight')}
           >
-            <input
+            <LengthInput
               id="p-indent-right"
-              type="text"
               aria-label="Right indent"
-              className="ui-input"
-              value={(block.indentRight as string) ?? ''}
-              onChange={(e) => setOptionalString('indentRight', e.target.value)}
-              placeholder="เช่น 1cm"
+              defaultUnit="cm"
+              value={block.indentRight}
+              onChange={(next) => setOptionalString('indentRight', next ?? '')}
             />
           </Field>
         )}
@@ -212,16 +209,15 @@ export function ParagraphProps({ block, path, state }: ParagraphPropsProps) {
             htmlFor="p-first-indent"
             onReset={() => resetKey('firstLineIndent')}
           >
-            <input
+            <LengthInput
               id="p-first-indent"
-              type="text"
               aria-label="First line indent"
-              className="ui-input"
-              value={(block.firstLineIndent as string) ?? ''}
-              onChange={(e) =>
-                setOptionalString('firstLineIndent', e.target.value)
+              defaultUnit="cm"
+              allowNegative
+              value={block.firstLineIndent}
+              onChange={(next) =>
+                setOptionalString('firstLineIndent', next ?? '')
               }
-              placeholder="เช่น 2.5cm"
             />
           </Field>
         )}
@@ -232,14 +228,12 @@ export function ParagraphProps({ block, path, state }: ParagraphPropsProps) {
             htmlFor="p-space-before"
             onReset={() => resetKey('spaceBefore')}
           >
-            <input
+            <LengthInput
               id="p-space-before"
-              type="text"
               aria-label="Space before"
-              className="ui-input"
-              value={(block.spaceBefore as string) ?? ''}
-              onChange={(e) => setOptionalString('spaceBefore', e.target.value)}
-              placeholder="เช่น 6pt"
+              defaultUnit="pt"
+              value={block.spaceBefore}
+              onChange={(next) => setOptionalString('spaceBefore', next ?? '')}
             />
           </Field>
         )}
@@ -250,14 +244,12 @@ export function ParagraphProps({ block, path, state }: ParagraphPropsProps) {
             htmlFor="p-space-after"
             onReset={() => resetKey('spaceAfter')}
           >
-            <input
+            <LengthInput
               id="p-space-after"
-              type="text"
               aria-label="Space after"
-              className="ui-input"
-              value={(block.spaceAfter as string) ?? ''}
-              onChange={(e) => setOptionalString('spaceAfter', e.target.value)}
-              placeholder="เช่น 6pt"
+              defaultUnit="pt"
+              value={block.spaceAfter}
+              onChange={(next) => setOptionalString('spaceAfter', next ?? '')}
             />
           </Field>
         )}

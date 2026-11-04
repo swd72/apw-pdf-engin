@@ -307,6 +307,28 @@ textarea {
   line-height: 1.55;
 }
 
+.ui-length-input {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  width: 100%;
+  min-width: 0;
+}
+
+.ui-length-input__number {
+  flex: 1 1 0%;
+  min-width: 0;
+  width: 0;
+}
+
+.ui-length-input__unit {
+  flex: 0 1 72px;
+  min-width: 52px;
+  width: 72px;
+  padding-left: var(--sp-1);
+  padding-right: var(--sp-1);
+}
+
 .ui-field {
   display: flex;
   flex-direction: column;

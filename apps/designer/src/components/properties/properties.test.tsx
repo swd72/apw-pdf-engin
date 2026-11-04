@@ -188,8 +188,42 @@ describe('PropertiesPanel and block property editors', () => {
     const indentLeftOption = getByText('indentLeft')
     fireEvent.click(indentLeftOption)
 
-    expect(queryByLabelText('Left indent')).not.toBeNull()
+    const indentInput = queryByLabelText('Left indent') as HTMLInputElement | null
+    expect(indentInput).not.toBeNull()
+    expect(indentInput!.getAttribute('inputmode')).toBe('decimal')
     expect('indentLeft' in (state.doc.blocks[0] as Record<string, unknown>)).toBe(false)
+
+    fireEvent.change(indentInput!, { target: { value: '2' } })
+    expect(state.updateBlock).toHaveBeenCalledWith(['blocks', 0], {
+      indentLeft: '2cm',
+    })
+  })
+
+  it('ParagraphProps spaceBefore shows number 6 + unit pt for spaceBefore: 6pt and picking cm writes 0.21cm to the block', () => {
+    const onChange = vi.fn()
+    const initialBlock: ParagraphBlock = {
+      type: 'paragraph',
+      text: 'Spaced text',
+      spaceBefore: '6pt',
+    }
+
+    const { getByLabelText } = render(
+      <StatefulParagraphHarness initialBlock={initialBlock} onChange={onChange} />,
+    )
+
+    const numInput = getByLabelText('Space before') as HTMLInputElement
+    const unitSelect = getByLabelText('Space before unit') as HTMLSelectElement
+
+    expect(numInput.value).toBe('6')
+    expect(unitSelect.value).toBe('pt')
+
+    fireEvent.change(unitSelect, { target: { value: 'cm' } })
+
+    expect(numInput.value).toBe('0.21')
+    expect(unitSelect.value).toBe('cm')
+    expect(onChange).toHaveBeenCalledTimes(1)
+    const savedBlock = onChange.mock.calls[0]![0].doc.blocks[0] as ParagraphBlock
+    expect(savedBlock.spaceBefore).toBe('0.21cm')
   })
 
   it('ParagraphProps reset removes the key from the block', () => {

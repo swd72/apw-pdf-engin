@@ -7,6 +7,7 @@ import { TrashIcon } from '../../../ui/icons.js'
 import { Section } from '../Section.js'
 import { Field } from '../Field.js'
 import { AddProperty, type AddPropertyOption } from '../AddProperty.js'
+import { LengthInput } from '../../../ui/LengthInput.js'
 import { commitBlockPatch, isPropertySet } from '../shared.js'
 
 export interface ColumnsPropsProps {
@@ -136,18 +137,16 @@ export function ColumnsProps({ block, path, state }: ColumnsPropsProps) {
             htmlFor="cols-gap"
             onReset={() => resetKey('gap')}
           >
-            <input
+            <LengthInput
               id="cols-gap"
-              type="text"
               aria-label="Columns gap"
-              className="ui-input"
-              value={(block.gap as string) ?? ''}
-              onChange={(e) =>
+              defaultUnit="cm"
+              value={block.gap}
+              onChange={(next) =>
                 commitBlockPatch(state, path, block, {
-                  gap: e.target.value === '' ? undefined : e.target.value,
+                  gap: next,
                 })
               }
-              placeholder="เช่น 12pt, 1cm"
             />
           </Field>
         )}

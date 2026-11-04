@@ -5,6 +5,7 @@ import type { BlockPath } from '../../../editor/docModel.js'
 import { Section } from '../Section.js'
 import { Field } from '../Field.js'
 import { AddProperty, type AddPropertyOption } from '../AddProperty.js'
+import { LengthInput } from '../../../ui/LengthInput.js'
 import { commitBlockPatch, isPropertySet } from '../shared.js'
 
 export interface LinePropsProps {
@@ -61,19 +62,16 @@ export function LineProps({ block, path, state }: LinePropsProps) {
                 : undefined
             }
           >
-            <input
+            <LengthInput
               id="line-thickness"
-              type="text"
               aria-label="Line thickness"
-              className="ui-input"
-              value={(block.thickness as string) ?? ''}
-              onChange={(e) =>
+              defaultUnit="pt"
+              value={block.thickness}
+              onChange={(next) =>
                 commitBlockPatch(state, path, block, {
-                  thickness:
-                    e.target.value === '' ? undefined : e.target.value,
+                  thickness: next,
                 })
               }
-              placeholder="เช่น 1pt"
             />
           </Field>
 
@@ -110,19 +108,16 @@ export function LineProps({ block, path, state }: LinePropsProps) {
             htmlFor="line-space-before"
             onReset={() => resetKey('spaceBefore')}
           >
-            <input
+            <LengthInput
               id="line-space-before"
-              type="text"
               aria-label="Space before"
-              className="ui-input"
-              value={(block.spaceBefore as string) ?? ''}
-              onChange={(e) =>
+              defaultUnit="pt"
+              value={block.spaceBefore}
+              onChange={(next) =>
                 commitBlockPatch(state, path, block, {
-                  spaceBefore:
-                    e.target.value === '' ? undefined : e.target.value,
+                  spaceBefore: next,
                 })
               }
-              placeholder="เช่น 6pt"
             />
           </Field>
         )}
@@ -133,19 +128,16 @@ export function LineProps({ block, path, state }: LinePropsProps) {
             htmlFor="line-space-after"
             onReset={() => resetKey('spaceAfter')}
           >
-            <input
+            <LengthInput
               id="line-space-after"
-              type="text"
               aria-label="Space after"
-              className="ui-input"
-              value={(block.spaceAfter as string) ?? ''}
-              onChange={(e) =>
+              defaultUnit="pt"
+              value={block.spaceAfter}
+              onChange={(next) =>
                 commitBlockPatch(state, path, block, {
-                  spaceAfter:
-                    e.target.value === '' ? undefined : e.target.value,
+                  spaceAfter: next,
                 })
               }
-              placeholder="เช่น 6pt"
             />
           </Field>
         )}
