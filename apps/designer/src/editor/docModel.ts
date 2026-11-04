@@ -170,6 +170,127 @@ export function moveBlock(doc: DocumentDef, path: BlockPath, delta: -1 | 1): Doc
   return updated as DocumentDef
 }
 
+const LOOP_VAR_REF_RE = /\{\{\s*([a-zA-Z_$][\w$]*)/g
+
+function collectReferencedRoots(node: unknown, out: Set<string>): void {
+  if (typeof node === 'string') {
+    LOOP_VAR_REF_RE.lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = LOOP_VAR_REF_RE.exec(node)) !== null) {
+      if (m[1]) {
+        out.add(m[1])
+      }
+    }
+    return
+  }
+  if (!node || typeof node !== 'object') return
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      collectReferencedRoots(item, out)
+    }
+    return
+  }
+  const rec = node as Record<string, unknown>
+  if (rec.type === 'each' && typeof rec.of === 'string') {
+    const root = rec.of.trim().split('.')[0]
+    if (root) out.add(root)
+  } else if (
+    rec.type === 'table' &&
+    rec.rows &&
+    typeof rec.rows === 'object' &&
+    !Array.isArray(rec.rows) &&
+    typeof (rec.rows as Record<string, unknown>).each === 'string'
+  ) {
+    const root = ((rec.rows as Record<string, unknown>).each as string)
+      .trim()
+      .split('.')[0]
+    if (root) out.add(root)
+  }
+  for (const key of Object.keys(rec)) {
+    collectReferencedRoots(rec[key], out)
+  }
+}
+
+function enclosingLoopScopes(
+  doc: DocumentDef,
+  path: BlockPath,
+): Array<{ name: string; arrayPath: string }> {
+  if (!doc || !Array.isArray(path) || path.length === 0) return []
+  const scopes: Array<{ name: string; arrayPath: string }> = []
+  for (let k = 2; k <= path.length; k++) {
+    const sub = path.slice(0, k)
+    const b = getBlock(doc, sub)
+    if (!b) continue
+    if (b.type === 'each' && path.length > k) {
+      if (b.as && b.of) {
+        scopes.push({ name: b.as, arrayPath: b.of })
+      }
+    } else if (
+      b.type === 'table' &&
+      b.rows &&
+      typeof b.rows === 'object' &&
+      !Array.isArray(b.rows) &&
+      'each' in b.rows &&
+      'as' in b.rows
+    ) {
+      if (path.length > k && path[k] === 'rows') {
+        scopes.push({ name: b.rows.as, arrayPath: b.rows.each })
+      }
+    }
+  }
+  return scopes
+}
+
+export function loopVarsBrokenByMove(
+  doc: DocumentDef,
+  from: BlockPath,
+  toListPath: BlockPath,
+): string[] {
+  if (!doc || !Array.isArray(from) || !Array.isArray(toListPath)) return []
+  const block = getBlock(doc, from)
+  if (!block) return []
+
+  const fromScopes = enclosingLoopScopes(doc, from)
+  if (fromScopes.length === 0) return []
+
+  const toScopeNames = new Set(
+    enclosingLoopScopes(doc, toListPath).map((s) => s.name),
+  )
+  const lostScopes = fromScopes.filter((s) => !toScopeNames.has(s.name))
+  if (lostScopes.length === 0) return []
+
+  const referenced = new Set<string>()
+  collectReferencedRoots(block, referenced)
+
+  const broken: string[] = []
+  for (const scope of lostScopes) {
+    if (referenced.has(scope.name) && !broken.includes(scope.name)) {
+      broken.push(scope.name)
+    }
+  }
+  return broken
+}
+
+export function loopMoveGuardTitle(
+  doc: DocumentDef,
+  from: BlockPath,
+  toListPath: BlockPath,
+): string | undefined {
+  const broken = loopVarsBrokenByMove(doc, from, toListPath)
+  if (broken.length === 0) return undefined
+  const fromScopes = enclosingLoopScopes(doc, from)
+  const loopNames: string[] = []
+  for (const name of broken) {
+    const match = fromScopes.find((s) => s.name === name)
+    if (match && !loopNames.includes(match.arrayPath)) {
+      loopNames.push(match.arrayPath)
+    }
+  }
+  const varsText = broken.map((v) => `{{${v}}}`).join(', ')
+  const loopsText = loopNames.join(', ')
+  return `ใช้ตัวแปร ${varsText} ของลูป ${loopsText} — ย้ายออกนอกลูปไม่ได้`
+}
+
 export function canMoveInto(
   doc: DocumentDef,
   path: BlockPath,
@@ -213,6 +334,7 @@ export function moveBlockTo(
   index: number,
 ): DocumentDef {
   if (!canMoveInto(doc, from, toListPath)) return doc
+  if (loopVarsBrokenByMove(doc, from, toListPath).length > 0) return doc
   const block = getBlock(doc, from)
   if (!block) return doc
 
@@ -233,6 +355,7 @@ export function moveInto(
   targetListPath: BlockPath,
 ): DocumentDef {
   if (!canMoveInto(doc, path, targetListPath)) return doc
+  if (loopVarsBrokenByMove(doc, path, targetListPath).length > 0) return doc
   const block = getBlock(doc, path)
   if (!block) return doc
 
@@ -266,6 +389,7 @@ export function moveOut(doc: DocumentDef, path: BlockPath): DocumentDef {
   const parentListPath = parentBlockPath.slice(0, -1)
   const parentIndex = parentBlockPath[parentBlockPath.length - 1]
   if (typeof parentIndex !== 'number') return doc
+  if (loopVarsBrokenByMove(doc, path, parentListPath).length > 0) return doc
 
   const docWithoutBlock = removeBlock(doc, path)
   return insertBlock(docWithoutBlock, parentListPath, parentIndex + 1, block)

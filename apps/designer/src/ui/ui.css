@@ -794,6 +794,19 @@ textarea {
   background-color: var(--c-preview-canvas);
 }
 
+.pdf-stage__stale-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-4);
+  border-bottom: 1px solid var(--c-danger-border);
+  background-color: var(--c-danger-bg);
+  color: var(--c-danger);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
 .pdf-stage__canvas {
   flex: 1;
   min-width: 0;

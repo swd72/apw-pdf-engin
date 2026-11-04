@@ -536,4 +536,114 @@ describe('StageOverlay and PdfStage guides/sync', () => {
     })
     expect(canvasWrap.scrollTop).toBeGreaterThan(0)
   })
+
+  it('shows PDF ไม่ได้อัปเดต alert and hides .stage-box, toolbar and inline editor when preview reports error with pages from an earlier render; boxes return on ready', async () => {
+    const doc1 = createDoc([{ type: 'paragraph', text: 'ย่อหน้าแรก' }])
+    const doc2 = createDoc([{ type: 'paragraph', text: '{{p}}' }])
+    const doc3 = createDoc([{ type: 'paragraph', text: 'แก้ไขสำเร็จ' }])
+
+    const pages1: PageInfo[] = [
+      {
+        width: 595,
+        height: 842,
+        content: { x: 85, y: 56, w: 453, h: 730 },
+        boxes: [{ path: 'blocks[0]', x: 85, y: 60, w: 453, h: 24 }],
+      },
+    ]
+
+    let callCount = 0
+    const client: RenderClient = {
+      render: vi.fn(async (): Promise<RenderResponse> => {
+        callCount++
+        if (callCount === 1) {
+          return {
+            id: 1,
+            ok: true,
+            bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46]),
+            pageCount: 1,
+            warnings: [],
+            pages: pages1,
+          }
+        }
+        if (callCount === 2) {
+          return {
+            id: 2,
+            ok: false,
+            error: {
+              code: 'MISSING_VARIABLE',
+              message: 'Missing variable "p"',
+            },
+          }
+        }
+        return {
+          id: 3,
+          ok: true,
+          bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46]),
+          pageCount: 1,
+          warnings: [],
+          pages: pages1,
+        }
+      }),
+      dispose: vi.fn(),
+    }
+
+    function StaleStageHarness({ currentDoc }: { currentDoc: DocumentDef }) {
+      const initial = React.useMemo(
+        () => ({ doc: currentDoc, data: EMPTY_DATA }),
+        [currentDoc],
+      )
+      const editor = useEditorState(initial, NOOP)
+      return (
+        <PdfStage
+          doc={currentDoc}
+          data={EMPTY_DATA}
+          client={client}
+          editor={editor}
+        />
+      )
+    }
+
+    const { container, rerender, queryByRole } = render(
+      <StaleStageHarness currentDoc={doc1} />,
+    )
+
+    await act(async () => {
+      vi.advanceTimersByTime(50)
+    })
+
+    // First render succeeded: 1 box, guides visible, no alert
+    expect(container.querySelectorAll('.stage-box').length).toBe(1)
+    expect(container.querySelector('.stage-guides')).not.toBeNull()
+    expect(queryByRole('alert')).toBeNull()
+
+    // Select the box so toolbar appears
+    fireEvent.click(container.querySelector<HTMLElement>('.stage-box')!)
+    expect(container.querySelector('.stage-toolbar')).not.toBeNull()
+
+    // Second render fails while old bytes/pages remain on screen
+    rerender(<StaleStageHarness currentDoc={doc2} />)
+    await act(async () => {
+      vi.advanceTimersByTime(50)
+    })
+
+    const alertEl = queryByRole('alert')
+    expect(alertEl).not.toBeNull()
+    expect(alertEl!.textContent).toBe(
+      'PDF ไม่ได้อัปเดต — Missing variable "p"',
+    )
+    expect(container.querySelectorAll('.stage-box').length).toBe(0)
+    expect(container.querySelector('.stage-toolbar')).toBeNull()
+    expect(container.querySelector('.stage-inline-editor')).toBeNull()
+    // Guides may stay
+    expect(container.querySelector('.stage-guides')).not.toBeNull()
+
+    // Third render succeeds -> alert disappears and boxes return
+    rerender(<StaleStageHarness currentDoc={doc3} />)
+    await act(async () => {
+      vi.advanceTimersByTime(50)
+    })
+
+    expect(queryByRole('alert')).toBeNull()
+    expect(container.querySelectorAll('.stage-box').length).toBe(1)
+  })
 })

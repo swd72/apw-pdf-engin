@@ -3,6 +3,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, fireEvent, cleanup } from '@testing-library/react'
 import type { Block, DocumentDef, ColumnsBlock } from '@apw-pdf/core'
 import type { EditorState } from '../../editor/useEditorState.js'
+import { useEditorState } from '../../editor/useEditorState.js'
 import type { Binding } from '../../editor/bindings.js'
 import type { BlockPath } from '../../editor/docModel.js'
 import { OutlineTree } from './OutlineTree.js'
@@ -114,11 +115,11 @@ describe('OutlineTree', () => {
     const firstRow = getAllByRole('treeitem')[0]!
     const buttonsInRow = firstRow.querySelectorAll('button')
     expect(buttonsInRow.length).toBe(1)
-    expect(queryByLabelText('Move up')).toBeNull()
-    expect(queryByLabelText('Move down')).toBeNull()
+    expect(queryByLabelText('เลื่อนขึ้น')).toBeNull()
+    expect(queryByLabelText('เลื่อนลง')).toBeNull()
   })
 
-  it('menu Delete removes the block', () => {
+  it('menu ลบ removes the block', () => {
     const doc = createDoc([{ type: 'paragraph', text: 'Delete me' }])
     const state = createMockEditorState(doc, ['blocks', 0])
     const { getAllByRole, getByLabelText } = render(
@@ -129,7 +130,7 @@ describe('OutlineTree', () => {
     const menuTrigger = row.querySelector('button')!
     fireEvent.click(menuTrigger)
 
-    const deleteItem = getByLabelText('Delete')
+    const deleteItem = getByLabelText('ลบ')
     fireEvent.click(deleteItem)
     expect(state.select).toHaveBeenCalledWith(['blocks', 0])
     expect(state.removeSelected).toHaveBeenCalledTimes(1)
@@ -282,5 +283,104 @@ describe('OutlineTree', () => {
     const { getByLabelText } = render(<OutlineTree state={state} />)
 
     expect(getByLabelText('Unresolved binding')).not.toBeNull()
+  })
+
+  it('dropping {{p}} outside the loop is refused and menu item ย้ายออกนอกกลุ่ม is disabled with tooltip', () => {
+    const doc = createDoc([
+      { type: 'paragraph', text: 'หัวเรื่อง' },
+      {
+        type: 'each',
+        of: 'body',
+        as: 'p',
+        blocks: [{ type: 'paragraph', text: '{{p}}' }],
+      },
+    ])
+    const state = createMockEditorState(doc, ['blocks', 1, 'blocks', 0])
+    const { container, getAllByRole, getByLabelText } = render(
+      <OutlineTree state={state} />,
+    )
+
+    const rows = getAllByRole('treeitem')
+    // rows[0] = blocks[0], rows[1] = blocks[1] (each), rows[2] = blocks[1].blocks[0] ({{p}})
+    const loopChildRow = rows[2]!
+    const dataTransfer = createDataTransferStub()
+
+    fireEvent.dragStart(loopChildRow, { dataTransfer })
+
+    const rootDropSlot = container.querySelector(
+      '[data-drop-list="blocks"][data-drop-index="0"]',
+    )!
+    fireEvent.dragOver(rootDropSlot, { dataTransfer })
+    expect(dataTransfer.dropEffect).toBe('none')
+    expect(
+      rootDropSlot.classList.contains('outline-tree__drop-slot--active'),
+    ).toBe(false)
+
+    fireEvent.drop(rootDropSlot, { dataTransfer })
+    expect(state.moveBlockTo).not.toHaveBeenCalled()
+
+    // Also test dropping directly on a root row
+    fireEvent.dragStart(loopChildRow, { dataTransfer })
+    fireEvent.dragOver(rows[0]!, { dataTransfer })
+    expect(dataTransfer.dropEffect).toBe('none')
+    fireEvent.drop(rows[0]!, { dataTransfer })
+    expect(state.moveBlockTo).not.toHaveBeenCalled()
+
+    // Open row menu on {{p}} and check ย้ายออกนอกกลุ่ม is disabled with tooltip
+    const menuTrigger = loopChildRow.querySelector('button')!
+    fireEvent.click(menuTrigger)
+
+    const moveOutItem = getByLabelText('ย้ายออกนอกกลุ่ม') as HTMLButtonElement
+    expect(moveOutItem.disabled).toBe(true)
+    expect(moveOutItem.getAttribute('title')).toBe(
+      'ใช้ตัวแปร {{p}} ของลูป body — ย้ายออกนอกลูปไม่ได้',
+    )
+  })
+
+  it('dropping {{p}} outside the loop with real useEditorState leaves doc unchanged, while dropping into a loop is allowed', () => {
+    const initialDoc = createDoc([
+      { type: 'paragraph', text: 'ย่อหน้าบน' },
+      {
+        type: 'each',
+        of: 'body',
+        as: 'p',
+        blocks: [{ type: 'paragraph', text: '{{p}}' }],
+      },
+    ])
+    const emptyData = {}
+    const noop = () => {}
+    let latestState: EditorState | null = null
+
+    function Harness() {
+      const initial = React.useMemo(
+        () => ({ doc: initialDoc, data: emptyData }),
+        [],
+      )
+      const editor = useEditorState(initial, noop)
+      latestState = editor
+      return <OutlineTree state={editor} />
+    }
+
+    const { container, getAllByRole } = render(<Harness />)
+    const rows = getAllByRole('treeitem')
+    const dataTransfer = createDataTransferStub()
+
+    // Try dragging {{p}} (rows[2]) to root slot 0 -> refused, doc unchanged
+    fireEvent.dragStart(rows[2]!, { dataTransfer })
+    const rootSlot = container.querySelector(
+      '[data-drop-list="blocks"][data-drop-index="0"]',
+    )!
+    fireEvent.dragOver(rootSlot, { dataTransfer })
+    fireEvent.drop(rootSlot, { dataTransfer })
+    expect(latestState!.doc).toBe(initialDoc)
+
+    // Dragging root paragraph (rows[0]) into the loop is allowed
+    fireEvent.dragStart(rows[0]!, { dataTransfer })
+    const loopSlot = container.querySelector(
+      '[data-drop-list="blocks.1.blocks"][data-drop-index="0"]',
+    )!
+    fireEvent.dragOver(loopSlot, { dataTransfer })
+    fireEvent.drop(loopSlot, { dataTransfer })
+    expect(latestState!.doc.blocks.length).toBe(1)
   })
 })

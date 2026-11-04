@@ -96,8 +96,26 @@ export function PdfStage({
   const [pages, setPages] = useState<PageInfo[]>([])
   const pendingPagesRef = useRef<PageInfo[] | null>(null)
   const [showGuides, setShowGuides] = useState<boolean>(() => readGuidesPref())
+  const [hasRendered, setHasRendered] = useState(false)
+  const [staleError, setStaleError] = useState<{
+    code: string
+    message: string
+  } | null>(null)
   const selectedFromOverlayRef = useRef<string | null>(null)
   const lastScrolledKeyRef = useRef<string | null>(null)
+
+  const isStaleError = (hasRendered || pages.length > 0) && staleError !== null
+
+  const handleStatusChange = useCallback<
+    NonNullable<PdfPreviewProps['onStatusChange']>
+  >((status, err) => {
+    if (status === 'ready') {
+      setHasRendered(true)
+      setStaleError(null)
+    } else if (status === 'error' && err) {
+      setStaleError(err)
+    }
+  }, [])
 
   const pageSize = useMemo(() => pageSizePt(effectiveDoc), [effectiveDoc])
 
@@ -258,7 +276,7 @@ export function PdfStage({
   const selectedKey = editor?.selectedPath ? pathKey(editor.selectedPath) : ''
 
   const firstSelectedPageIndex = useMemo(() => {
-    if (!editor || !selectedKey) return -1
+    if (!editor || !selectedKey || isStaleError) return -1
     for (let pIdx = 0; pIdx < pages.length; pIdx++) {
       const p = pages[pIdx]!
       for (const b of p.boxes) {
@@ -269,9 +287,10 @@ export function PdfStage({
       }
     }
     return -1
-  }, [editor?.doc, selectedKey, pages])
+  }, [editor?.doc, selectedKey, pages, isStaleError])
 
   useEffect(() => {
+    if (isStaleError) return
     if (!editor || !selectedKey) {
       lastScrolledKeyRef.current = null
       selectedFromOverlayRef.current = null
@@ -322,7 +341,7 @@ export function PdfStage({
     if (boxTop < viewTop || (el.clientHeight > 0 && boxBottom > viewBottom)) {
       el.scrollTop = Math.max(0, boxTop - 24)
     }
-  }, [editor?.doc, selectedKey, pages, scale])
+  }, [editor?.doc, selectedKey, pages, scale, isStaleError])
 
   const renderOverlay = useCallback<
     NonNullable<PdfPreviewProps['renderOverlay']>
@@ -338,7 +357,8 @@ export function PdfStage({
           page={activePage}
           editor={editor}
           showGuides={showGuides}
-          showToolbar={pageIndex === firstSelectedPageIndex}
+          showToolbar={!isStaleError && pageIndex === firstSelectedPageIndex}
+          stale={isStaleError}
           onEditJson={onEditJson}
           onFocusProperties={onFocusProperties}
           onSelectFromOverlay={handleSelectFromOverlay}
@@ -349,6 +369,7 @@ export function PdfStage({
       editor,
       pages,
       showGuides,
+      isStaleError,
       firstSelectedPageIndex,
       onEditJson,
       onFocusProperties,
@@ -429,6 +450,11 @@ export function PdfStage({
       client={trackedClient}
     >
       <div className="pdf-stage">
+        {isStaleError && staleError && (
+          <div role="alert" className="pdf-stage__stale-strip">
+            {`PDF ไม่ได้อัปเดต — ${staleError.message}`}
+          </div>
+        )}
         <div
           ref={scrollRef}
           className="pdf-stage__canvas"
@@ -442,6 +468,7 @@ export function PdfStage({
             onPageCountChange={handlePageCountChange}
             renderOverlay={editor ? renderOverlay : undefined}
             onPagesChange={editor ? handlePagesChange : undefined}
+            onStatusChange={handleStatusChange}
           />
         </div>
 

@@ -46,6 +46,7 @@ export interface PreviewPagesProps {
   onPageCountChange?: (count: number) => void
   renderOverlay?: PdfPreviewProps['renderOverlay']
   onPagesChange?: PdfPreviewProps['onPagesChange']
+  onStatusChange?: PdfPreviewProps['onStatusChange']
 }
 
 export function PreviewPages({
@@ -55,6 +56,7 @@ export function PreviewPages({
   onPageCountChange,
   renderOverlay,
   onPagesChange,
+  onStatusChange,
 }: PreviewPagesProps) {
   if (!effectiveDoc) {
     return <div className="pdf-stage__empty">ยังไม่มีเทมเพลต</div>
@@ -81,11 +83,13 @@ export function PreviewPages({
         data={effectiveData}
         scale={scale}
         debounceMs={0}
+        strict={false}
         className="pdf-stage__pages"
         pageClassName="pdf-stage__page"
         onPageCountChange={onPageCountChange}
         renderOverlay={renderOverlay}
         onPagesChange={onPagesChange}
+        onStatusChange={onStatusChange}
       />
     </div>
   )
