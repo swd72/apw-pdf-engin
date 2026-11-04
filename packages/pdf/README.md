@@ -1,3 +1,31 @@
 # @apw-pdf/pdf
 
-Pure TypeScript PDF writer for `@apw-pdf/core`. Subsets TrueType fonts with `harfbuzz-subset.wasm` (retaining Glyph IDs), embeds `CIDFontType2` / `Identity-H` fonts with `/ToUnicode` CMaps for accurate Thai text extraction, and renders `LayoutTree` pages deterministically via `pdf-lib`.
+PDF 1.7 writer for `@apw-pdf` built on `pdf-lib` and `hb-subset.wasm`. Embeds subsetted `CIDFontType2` TrueType fonts with `/ToUnicode` CMaps and `/ActualText` tagging for accurate Thai copy/paste and search.
+
+## Installation
+
+```bash
+pnpm add @apw-pdf/pdf @apw-pdf/core
+```
+
+## Minimal Usage
+
+```ts
+import { createPdfEngine } from '@apw-pdf/pdf'
+
+const engine = await createPdfEngine({
+  fonts: myFontProvider,
+  images: myImageProvider,
+  subsetWasm: hbSubsetWasmBytes,
+})
+
+const { bytes, pageCount, warnings } = await engine.renderPdf(documentDef, data)
+```
+
+## Documentation
+
+See the [main repository README](https://github.com/swd72/apw-pdf-engin#readme) for full documentation.
+
+## License
+
+MIT

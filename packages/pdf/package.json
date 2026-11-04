@@ -1,6 +1,29 @@
 {
   "name": "@apw-pdf/pdf",
-  "version": "1.0.0",
+  "version": "0.1.0",
+  "description": "PDF 1.7 writer for @apw-pdf with CIDFontType2 TrueType subsetting, ToUnicode CMap, and Thai Sara Am handling.",
+  "keywords": [
+    "pdf",
+    "thai",
+    "pdf-lib",
+    "harfbuzz",
+    "subset",
+    "cidfont"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/swd72/apw-pdf-engin#readme",
+  "bugs": {
+    "url": "https://github.com/swd72/apw-pdf-engin/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swd72/apw-pdf-engin.git",
+    "directory": "packages/pdf"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -13,11 +36,14 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
   "scripts": {
     "build": "tsup",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
     "@apw-pdf/core": "workspace:*",

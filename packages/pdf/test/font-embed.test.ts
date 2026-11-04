@@ -30,7 +30,7 @@ describe('font subsetting and CID font embedding', () => {
     const subset = await createSubsetter(wasmBytes)
 
     const reg = FontRegistry.create(fontProvider())
-    const font = await reg.get('THSarabunIT9', false, false)
+    const font = await reg.get('THSarabunNew', false, false)
     const origRun = font.shape('ปี่', 16)
     const origGids = origRun.glyphs.map((g) => g.id)
     expect(origGids).toEqual([240, 344, 361])
@@ -71,7 +71,7 @@ describe('font subsetting and CID font embedding', () => {
     const subset = await createSubsetter(wasmBytes)
 
     const reg = FontRegistry.create(fontProvider())
-    const font = await reg.get('THSarabunIT9', false, false)
+    const font = await reg.get('THSarabunNew', false, false)
 
     const doc = await PDFDocument.create()
     const page = doc.addPage([595.28, 841.89])

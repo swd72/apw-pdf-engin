@@ -1,6 +1,28 @@
 {
   "name": "@apw-pdf/core",
-  "version": "1.0.0",
+  "version": "0.1.0",
+  "description": "Runtime-agnostic Thai PDF layout engine with HarfBuzz shaping, Intl.Segmenter word breaking, and Thai justification.",
+  "keywords": [
+    "pdf",
+    "thai",
+    "layout",
+    "harfbuzz",
+    "typography",
+    "sarabun"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/swd72/apw-pdf-engin#readme",
+  "bugs": {
+    "url": "https://github.com/swd72/apw-pdf-engin/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swd72/apw-pdf-engin.git",
+    "directory": "packages/core"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -13,11 +35,14 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
   "scripts": {
     "build": "tsup",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
     "harfbuzzjs": "1.6.4",

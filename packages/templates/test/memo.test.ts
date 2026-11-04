@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { singleLineHeight } from '@apw-pdf/core'
+import { lineBox } from '@apw-pdf/core'
 import { memo } from '../src/index.js'
 import { findRun, getTestEngine, layoutOf } from './helpers.js'
 
@@ -26,9 +26,9 @@ describe('memo (บันทึกข้อความ) conformance', () => {
     const runCenter = item.x + runWidth / 2
     expect(runCenter).toBeCloseTo(311.811, 1)
 
-    // Line box exactly 35pt -> ascent = 35 * 850 / (850 + 250) = 27.0455
-    // Margin top = 42.5197 -> baseline = 42.5197 + 27.0455 = 69.5651
-    expect(item.y).toBeCloseTo(42.5197 + (35 * 850) / 1100, 2)
+    // Line box exactly 35pt -> ascent = 35 * 844 / (844 + 457) = 22.7056
+    // Margin top = 42.5197 -> baseline = 42.5197 + 22.7056 = 65.2253
+    expect(item.y).toBeCloseTo(42.5197 + (35 * 844) / (844 + 457), 2)
   })
 
   it('renders header labels bold 20pt with dotted leaders ending at contentRight 538.58', async () => {
@@ -70,8 +70,9 @@ describe('memo (บันทึกข้อความ) conformance', () => {
 
   it('gives เรียน spaceBefore 6pt (baseline - previous baseline = single(16) + 6 ± 0.01)', async () => {
     const engine = await getTestEngine()
-    const font = await engine.fonts.get('THSarabunIT9', false, false)
-    const single16 = singleLineHeight(font.metrics, 16)
+    const font = await engine.fonts.get('THSarabunNew', false, false)
+    const box16 = lineBox(font.metrics, 16, memo.document.font.lineSpacing)
+    const box20 = lineBox(font.metrics, 20, memo.document.font.lineSpacing)
 
     const tree = await layoutOf(memo, memo.example)
     const { item: subjectRun } = findRun(tree, 'เรื่อง')
@@ -90,11 +91,11 @@ describe('memo (บันทึกข้อความ) conformance', () => {
         .map((g) => g.y),
     )
     expect(prevLineY).toBeGreaterThanOrEqual(subjectRun.y)
-    // Preceding line ('เรื่อง') has a 20pt bold label (descent = 22.60 - 17.60 = 5.00pt vs 4.00pt for 16pt),
-    // so baseline delta = descent(20) + 6 + ascent(16) = 5.00 + 6 + 14.08 = 25.08 (= single(16) + 6 + 1)
-    const descent20 = singleLineHeight(font.metrics, 20) - (880 / 1000) * 20
-    const descent16 = single16 - (880 / 1000) * 16
-    expect(toRun.y - prevLineY).toBeCloseTo(single16 + 6 + (descent20 - descent16), 2)
+    // Preceding line ('เรื่อง') has a 20pt bold label (descent = 22.60 - 17.48 = 5.12pt vs 4.096pt for 16pt),
+    // so baseline delta = descent(20) + 6 + ascent(16) = 5.12 + 6 + 13.984 = 25.104 (= single(16) + 6 + (descent20 - descent16))
+    const descent20 = box20.height - box20.ascent
+    const descent16 = box16.height - box16.ascent
+    expect(toRun.y - prevLineY).toBeCloseTo(box16.height + 6 + (descent20 - descent16), 2)
   })
 
   it('indents first body line to 85.04 + 70.87 and distributes non-last body lines to 538.58 ± 0.01', async () => {

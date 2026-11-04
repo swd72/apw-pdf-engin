@@ -11,10 +11,13 @@ export const GOV_PAGE: DocumentDef['page'] = {
   },
 }
 
+// Reproduces the TH SarabunIT9 single line height (18.08pt at 16pt) with TH Sarabun New metrics.
+export const IT9_LINE_RATIO = 1130 / 1331
+
 export const GOV_FONT: DocumentDef['font'] = {
-  family: 'THSarabunIT9',
+  family: 'THSarabunNew',
   size: '16pt',
-  lineSpacing: 'single',
+  lineSpacing: { multiple: IT9_LINE_RATIO },
   color: '#000000',
 }
 

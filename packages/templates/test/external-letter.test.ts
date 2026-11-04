@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { singleLineHeight } from '@apw-pdf/core'
+import { lineBox } from '@apw-pdf/core'
 import { externalLetter, instantiateTemplate, memo } from '../src/index.js'
 import { findRun, getTestEngine, layoutOf } from './helpers.js'
 
@@ -47,8 +47,8 @@ describe('externalLetter (หนังสือภายนอก) conformance',
 
   it('gives เรื่อง / เรียน / อ้างถึง / สิ่งที่ส่งมาด้วย spaceBefore 6pt and omits อ้างถึง when reference is absent', async () => {
     const engine = await getTestEngine()
-    const font = await engine.fonts.get('THSarabunIT9', false, false)
-    const single16 = singleLineHeight(font.metrics, 16)
+    const font = await engine.fonts.get('THSarabunNew', false, false)
+    const single16 = lineBox(font.metrics, 16, externalLetter.document.font.lineSpacing).height
 
     const tree = await layoutOf(externalLetter, externalLetter.example)
     const { item: subjectRun } = findRun(tree, 'เรื่อง')
@@ -74,8 +74,8 @@ describe('externalLetter (หนังสือภายนอก) conformance',
 
   it('places closing ขอแสดงความนับถือ at 311.81 with spaceBefore 12pt and signer baseline + 2 * single(16)', async () => {
     const engine = await getTestEngine()
-    const font = await engine.fonts.get('THSarabunIT9', false, false)
-    const single16 = singleLineHeight(font.metrics, 16)
+    const font = await engine.fonts.get('THSarabunNew', false, false)
+    const single16 = lineBox(font.metrics, 16, externalLetter.document.font.lineSpacing).height
 
     const tree = await layoutOf(externalLetter, externalLetter.example)
     const { item: closingRun } = findRun(tree, 'ขอแสดงความนับถือ')
@@ -104,8 +104,8 @@ describe('externalLetter (หนังสือภายนอก) conformance',
 
   it('uses 0pt spacing between body paragraphs by default and supports paragraphSpacing option (T3)', async () => {
     const engine = await getTestEngine()
-    const font = await engine.fonts.get('THSarabunIT9', false, false)
-    const single16 = singleLineHeight(font.metrics, 16)
+    const font = await engine.fonts.get('THSarabunNew', false, false)
+    const single16 = lineBox(font.metrics, 16, externalLetter.document.font.lineSpacing).height
 
     const treeDefault = await layoutOf(externalLetter, externalLetter.example)
     const { item: p2FirstRun } = findRun(treeDefault, 'กรมบัญชีกลางขอเรียนว่า')

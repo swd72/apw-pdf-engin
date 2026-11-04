@@ -36,7 +36,7 @@ const baseDocSpec = {
     size: 'A4' as const,
     margin: { top: '1.5cm', bottom: '2cm', left: '3cm', right: '2cm' },
   },
-  font: { family: 'THSarabunIT9', size: '16pt' },
+  font: { family: 'THSarabunNew', size: '16pt' },
 }
 
 describe('tables and columns', () => {
@@ -245,7 +245,7 @@ describe('tables and columns', () => {
     expect(rightG.x).toBeCloseTo(85.0394 + (453.5433 - 6) / 2 + 6, 2)
     expect(rightG.y).toBeCloseTo(leftG.y, 2)
     // Next block starts after max column height (2 lines on right)
-    expect(afterG.y - leftG.y).toBeCloseTo(2 * 18.08, 2)
+    expect(afterG.y - leftG.y).toBeCloseTo(2 * 21.296, 2)
   })
 
   it('right-aligns each align:right paragraph in a column individually unless column align:right is set (M7)', async () => {

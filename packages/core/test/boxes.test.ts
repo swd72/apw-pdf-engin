@@ -19,7 +19,7 @@ const baseDocSpec = {
     size: 'A4' as const,
     margin: { top: '1.5cm', bottom: '2cm', left: '3cm', right: '2cm' },
   },
-  font: { family: 'THSarabunIT9', size: '16pt' },
+  font: { family: 'THSarabunNew', size: '16pt' },
 }
 
 describe('block boxes and blockKeyOf', () => {
@@ -50,7 +50,7 @@ describe('block boxes and blockKeyOf', () => {
           size: 'A4',
           margin: { top: '2.5cm', left: '3cm', right: '2cm', bottom: '2cm' },
         },
-        font: { family: 'THSarabunIT9', size: '16pt' },
+        font: { family: 'THSarabunNew', size: '16pt' },
         blocks: [{ type: 'paragraph', text: 'เนื้อหา' }],
       },
       {},

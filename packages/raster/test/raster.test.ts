@@ -31,7 +31,7 @@ async function createSampleA4Pdf(): Promise<Uint8Array> {
       size: 'A4',
       margin: { top: '2.5cm', bottom: '2cm', left: '3cm', right: '2cm' },
     },
-    font: { family: 'THSarabunIT9', size: '16pt' },
+    font: { family: 'THSarabunNew', size: '16pt' },
     blocks: [{ type: 'paragraph', text: 'บันทึกข้อความ ทดสอบ' }],
   }
   const { bytes } = await engine.renderPdf(doc, {})
@@ -84,7 +84,7 @@ describe('rasterizePage', () => {
         size: { width: '3500pt', height: '3500pt' },
         margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
       },
-      font: { family: 'THSarabunIT9', size: '16pt' },
+      font: { family: 'THSarabunNew', size: '16pt' },
       blocks: [{ type: 'paragraph', text: 'ใหญ่' }],
     }
     const { bytes: bigPdfBytes } = await engine.renderPdf(bigDoc, {})

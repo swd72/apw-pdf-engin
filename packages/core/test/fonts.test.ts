@@ -5,19 +5,19 @@ import { testFontProvider } from './helpers/fonts.js'
 import type { FontProvider } from '../src/fonts/provider.js'
 import { ApwPdfError } from '../src/errors.js'
 
-const FONT_FAMILIES = ['THSarabunIT9', 'THSarabunNew', 'THSarabunPSK', 'THNiramitIT9'] as const
+const FONT_FAMILIES = ['THSarabunNew', 'THSarabunPSK'] as const
 
 describe('font registry, metrics, and shaping', () => {
   const reg = FontRegistry.create(testFontProvider())
 
-  it('reads TH SarabunIT9 metrics', async () => {
-    const f = await reg.get('THSarabunIT9', false, false)
+  it('reads TH SarabunNew metrics', async () => {
+    const f = await reg.get('THSarabunNew', false, false)
     expect(f.metrics).toMatchObject({
       upem: 1000,
-      winAscent: 850,
-      winDescent: 250,
-      hheaAscender: 850,
-      hheaDescender: -250,
+      winAscent: 844,
+      winDescent: 457,
+      hheaAscender: 844,
+      hheaDescender: -457,
       hheaLineGap: 30,
     })
   })
@@ -53,7 +53,7 @@ describe('font registry, metrics, and shaping', () => {
   })
 
   it('shapes stacked Thai marks with zero-advance marks', async () => {
-    const f = await reg.get('THSarabunIT9', false, false)
+    const f = await reg.get('THSarabunNew', false, false)
     const r = f.shape('ปี่', 16)
     expect(r.glyphs.length).toBe(3)
     expect(r.glyphs[1]!.advance).toBe(0)
@@ -63,7 +63,7 @@ describe('font registry, metrics, and shaping', () => {
   })
 
   it('substitutes descenderless GSUB base glyphs for ญ and ฐ before below-vowels ุ/ู (Gap 4)', async () => {
-    const f = await reg.get('THSarabunIT9', false, false)
+    const f = await reg.get('THSarabunNew', false, false)
     const yoNormal = f.shape('ญะ', 16).glyphs[0]!.id
     const yoShortU = f.shape('ญุ', 16).glyphs[0]!.id
     const yoShortUu = f.shape('ญู', 16).glyphs[0]!.id
@@ -88,7 +88,7 @@ describe('font registry, metrics, and shaping', () => {
   )
 
   it('reports missing glyphs (Review Focus 4)', async () => {
-    const f = await reg.get('THSarabunIT9', false, false)
+    const f = await reg.get('THSarabunNew', false, false)
     expect(f.shape('ก✅中', 16).missing).toEqual(['✅', '中'])
   })
 
@@ -103,8 +103,8 @@ describe('font registry, metrics, and shaping', () => {
       },
     }
     const r2 = FontRegistry.create(fallbackProvider)
-    const f = await r2.get('THSarabunIT9', false, true)
-    expect(f.family).toBe('THSarabunIT9')
+    const f = await r2.get('THSarabunNew', false, true)
+    expect(f.family).toBe('THSarabunNew')
     expect(f.italic).toBe(false)
     expect(r2.warnings).toEqual([
       expect.objectContaining({ code: 'FONT_STYLE_FALLBACK' }),
@@ -143,7 +143,7 @@ describe('font registry, metrics, and shaping', () => {
         size: 'A4',
         margin: { top: '1.5cm', bottom: '2cm', left: '3cm', right: '2cm' },
       },
-      font: { family: 'THSarabunIT9', size: '16pt' },
+      font: { family: 'THSarabunNew', size: '16pt' },
       blocks: [
         {
           type: 'paragraph',

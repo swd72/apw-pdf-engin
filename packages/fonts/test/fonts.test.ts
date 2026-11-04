@@ -1,38 +1,44 @@
 import { describe, it, expect } from 'vitest'
-import fs from 'node:fs'
-import path from 'node:path'
+import { existsSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 import { FONT_FAMILIES, fontFileName } from '../src/index.js'
 import { fontsDir } from '../src/node.js'
+import { ApwPdfError } from '@apw-pdf/core'
 
 describe('@apw-pdf/fonts', () => {
-  it('resolves every FONT_FAMILIES × {bold, italic} combination to a valid TrueType file', () => {
+  it('lists the 2 bundled SIPA font families', () => {
     expect(FONT_FAMILIES).toEqual([
-      'THSarabunIT9',
       'THSarabunNew',
       'THSarabunPSK',
-      'THNiramitIT9',
     ])
-    for (const family of FONT_FAMILIES) {
-      for (const bold of [false, true]) {
-        for (const italic of [false, true]) {
-          const name = fontFileName(family, bold, italic)
-          const full = path.join(fontsDir, name)
-          expect(fs.existsSync(full), `Missing font file ${full}`).toBe(true)
-          const buf = fs.readFileSync(full)
-          expect(buf.length).toBeGreaterThan(1000)
-          // TrueType magic 00 01 00 00
-          expect(buf[0]).toBe(0x00)
-          expect(buf[1]).toBe(0x01)
-          expect(buf[2]).toBe(0x00)
-          expect(buf[3]).toBe(0x00)
-        }
-      }
+  })
+
+  it('maps family + style flags to filename', () => {
+    expect(fontFileName('THSarabunNew', false, false)).toBe('THSarabunNew-Regular.ttf')
+    expect(fontFileName('THSarabunNew', true, false)).toBe('THSarabunNew-Bold.ttf')
+    expect(fontFileName('THSarabunNew', false, true)).toBe('THSarabunNew-Italic.ttf')
+    expect(fontFileName('THSarabunNew', true, true)).toBe('THSarabunNew-BoldItalic.ttf')
+  })
+
+  it('throws FONT_NOT_FOUND on unknown family', () => {
+    expect(() => fontFileName('ComicSans', false, false)).toThrowError(ApwPdfError)
+    try {
+      fontFileName('ComicSans', false, false)
+    } catch (e) {
+      expect((e as ApwPdfError).code).toBe('FONT_NOT_FOUND')
     }
   })
 
-  it('throws FONT_NOT_FOUND for unknown family', () => {
-    expect(() => fontFileName('Comic', false, false)).toThrow(
-      expect.objectContaining({ code: 'FONT_NOT_FOUND' }),
-    )
+  it('every family x 4 variants exists on disk and is non-empty', () => {
+    expect(existsSync(fontsDir)).toBe(true)
+    for (const family of FONT_FAMILIES) {
+      for (const bold of [false, true]) {
+        for (const italic of [false, true]) {
+          const p = join(fontsDir, fontFileName(family, bold, italic))
+          expect(existsSync(p), `missing ${p}`).toBe(true)
+          expect(statSync(p).size).toBeGreaterThan(10_000)
+        }
+      }
+    }
   })
 })

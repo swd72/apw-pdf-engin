@@ -1,10 +1,8 @@
 import { ApwPdfError } from '@apw-pdf/core'
 
 export const FONT_FAMILIES = [
-  'THSarabunIT9',
   'THSarabunNew',
   'THSarabunPSK',
-  'THNiramitIT9',
 ] as const
 
 export type FontFamily = (typeof FONT_FAMILIES)[number]

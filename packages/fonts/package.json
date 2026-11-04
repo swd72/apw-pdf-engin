@@ -1,6 +1,29 @@
 {
   "name": "@apw-pdf/fonts",
-  "version": "1.0.0",
+  "version": "0.1.0",
+  "description": "SIPA Thai font files (TH Sarabun New and TH Sarabun PSK) and font family helpers for @apw-pdf.",
+  "keywords": [
+    "pdf",
+    "thai",
+    "fonts",
+    "sipa",
+    "sarabun",
+    "truetype"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/swd72/apw-pdf-engin#readme",
+  "bugs": {
+    "url": "https://github.com/swd72/apw-pdf-engin/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swd72/apw-pdf-engin.git",
+    "directory": "packages/fonts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -21,11 +44,14 @@
   "files": [
     "dist",
     "files",
-    "LICENSE-SIPA.txt"
+    "LICENSE",
+    "LICENSE-SIPA.txt",
+    "README.md"
   ],
   "scripts": {
     "build": "tsup",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
     "@apw-pdf/core": "workspace:*"

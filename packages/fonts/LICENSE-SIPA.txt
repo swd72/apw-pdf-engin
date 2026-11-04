@@ -2,10 +2,8 @@ SIPA National Fonts (ฟอนต์แห่งชาติ SIPA / กรมท
 ================================================================
 
 Included font families:
-- TH SarabunIT๙ (THSarabunIT9)
 - TH Sarabun New (THSarabunNew)
 - TH Sarabun PSK (THSarabunPSK)
-- TH NiramitIT๙ (THNiramitIT9)
 
 Source:
 Software Industry Promotion Agency (Public Organization) (SIPA) and
