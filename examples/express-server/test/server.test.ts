@@ -3,7 +3,7 @@ import type { Server } from 'node:http'
 import { isMainModule, pruneRateWindows, createApp } from '../server.js'
 
 describe('isMainModule', () => {
-  it('identifies Windows absolute file paths correctly', () => {
+  it.skipIf(process.platform !== 'win32')('identifies Windows absolute file paths correctly', () => {
     const metaUrl = 'file:///D:/AI/apw-pdf-engin/examples/express-server/dist/server.js'
     const argv1 = 'D:\\AI\\apw-pdf-engin\\examples\\express-server\\dist\\server.js'
     expect(isMainModule(metaUrl, argv1)).toBe(true)
@@ -20,9 +20,15 @@ describe('isMainModule', () => {
     expect(isMainModule(metaUrl, argv1)).toBe(true)
   })
 
-  it('handles paths with spaces and special characters', () => {
+  it.skipIf(process.platform !== 'win32')('handles Windows paths with spaces and special characters', () => {
     const metaUrl = 'file:///D:/My%20Projects/app/dist/server.js'
     const argv1 = 'D:\\My Projects\\app\\dist\\server.js'
+    expect(isMainModule(metaUrl, argv1)).toBe(true)
+  })
+
+  it.skipIf(process.platform === 'win32')('handles POSIX paths with spaces and special characters', () => {
+    const metaUrl = 'file:///home/user/My%20Projects/app/dist/server.js'
+    const argv1 = '/home/user/My Projects/app/dist/server.js'
     expect(isMainModule(metaUrl, argv1)).toBe(true)
   })
 
