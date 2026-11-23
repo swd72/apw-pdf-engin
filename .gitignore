@@ -6,3 +6,5 @@ coverage/
 examples/vite-react/public/
 apps/designer/public/
 apps/designer/saved-templates/
+# Unpublished fonts (TH SarabunIT9 / TH NiramitIT9): keep local only, never commit
+packages/fonts/extra/*.ttf
